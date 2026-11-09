@@ -122,7 +122,9 @@ uv run meshcore-repeater-info --input repeaters.csv --export-xlsx repeaters.xlsx
 ## CSV
 
 Файл пишется в `utf-8-sig` (BOM), разделитель `;`, окончания строк `CRLF`,
-поэтому открывается в Excel. Дробные проценты — с запятой.
+поэтому открывается в Excel. В CSV дробные проценты — с запятой; в XLSX
+экспорте они записываются как настоящие числовые проценты (`0.1234` с форматом
+`0.00%`), поэтому запятая CSV на них не влияет.
 
 Порядок колонок:
 
@@ -130,7 +132,7 @@ uv run meshcore-repeater-info --input repeaters.csv --export-xlsx repeaters.xlsx
 repeater_key;contact_name;last_advert_utc;firmware_version;repeater_name;
 owner_info;uptime;tx_airtime_pct;rx_airtime_pct;login_time_utc;
 clock_skew_sec;clock_status;neighbours_count;noise_floor_dbm;
-debug_flags;is_admin;login_password;login_method;login_attempts_last;
+debug_flags;is_admin;login_password;login_attempts_last;
 login_attempts_total;status;error
 ```
 
@@ -144,8 +146,6 @@ login_attempts_total;status;error
 - `is_admin` — `yes/no`, явный признак admin-сессии;
 - `login_password` — последний реально подошедший пароль (`(empty)` для
   пустого). При входе через ACL поле сохраняет ранее известный пароль;
-- `login_method` — `password` или `empty`; `empty` означает пустой пароль
-  (ACL или пустой гостевой пароль — прошивка их не различает);
 - `login_attempts_total` — накопленные неудачные login-попытки;
 - `status` — `ok`, `ok_old`, `partial`, `login_failed`, `timeout`, `error`,
   `final_fail`, `in_progress`.
@@ -215,7 +215,7 @@ uv run meshcore-repeater-info \
 - `status=ok`/`ok_old` — зелёный, `partial` — жёлтый, ошибки/таймауты —
   красный фон с белым текстом;
 - ошибочные строки — очень светлый красный фон;
-- старые даты, старая прошивка (<1.18), `clock_status != ok` и невалидные
+- старые даты, старая прошивка (<1.16), `clock_status != ok` и невалидные
   имена репитеров — красный текст;
 - `noise_floor_dbm == -120` и `debug_flags != 0` — оранжевый текст;
 - автоширина столбцов, форматы дат/процентов/чисел, freeze panes и автофильтр.

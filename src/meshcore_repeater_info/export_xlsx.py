@@ -102,7 +102,7 @@ def _firmware_is_old(value: str) -> bool:
     if not match:
         return False
     version = tuple(int(part or 0) for part in match.groups())
-    return version < (1, 18, 0)
+    return version < (1, 16, 0)
 
 
 def _date_is_far(value: str, now: int) -> bool:
@@ -157,7 +157,7 @@ def _write_value(worksheet, row: int, col: int, field: str, value: str, fmt) -> 
     if field in PERCENT_FIELDS and value:
         number = _percent(value)
         if number is not None:
-            worksheet.write_number(row, col, number, fmt)
+            worksheet.write_number(row, col, number / 100.0, fmt)
             return
     if field in INT_FIELDS and value:
         number = _number(value)
@@ -243,7 +243,7 @@ def export_csv_to_xlsx(
             elif field in DATE_FIELDS:
                 num_format = "yyyy-mm-dd hh:mm:ss"
             elif field in PERCENT_FIELDS:
-                num_format = '0.00"%"'
+                num_format = "0.00%"
             elif field in INT_FIELDS:
                 num_format = "0"
             else:

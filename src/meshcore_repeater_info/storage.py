@@ -33,7 +33,6 @@ FIELDS = [
     "debug_flags",
     "is_admin",
     "login_password",
-    "login_method",
     "login_attempts_last",
     "login_attempts_total",
     "status",
@@ -123,9 +122,6 @@ class CsvStore:
                     continue
                 row = {field: (raw.get(field) or "").strip() for field in FIELDS}
                 row["repeater_key"] = key
-                # Older reports used "acl" for any empty-password login.
-                if row.get("login_method") == "acl":
-                    row["login_method"] = "empty"
                 rows[key] = row
         return rows
 
@@ -203,7 +199,6 @@ class CsvStore:
         row["login_attempts_last"] = str(last)
         row["is_admin"] = "yes" if is_admin else "no"
         row["login_password"] = str(login_password)
-        row["login_method"] = str(login_method)
         row["status"] = "in_progress"
         row["error"] = ""
         self._write()
@@ -251,8 +246,6 @@ class CsvStore:
             row["is_admin"] = "yes" if result.is_admin else "no"
         if result.login_password is not None:
             row["login_password"] = str(result.login_password)
-        if result.login_method is not None:
-            row["login_method"] = str(result.login_method)
 
         row["login_attempts_last"] = str(result.login_attempts_last)
         row["login_attempts_total"] = str(result.login_attempts_total)

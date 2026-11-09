@@ -1,8 +1,9 @@
 from datetime import datetime
 
+import pytest
 from openpyxl import load_workbook
 
-from meshcore_repeater_info.export_xlsx import export_csv_to_xlsx
+from meshcore_repeater_info.export_xlsx import _firmware_is_old, export_csv_to_xlsx
 from meshcore_repeater_info.model import PollResult
 from meshcore_repeater_info.storage import CsvStore
 
@@ -43,7 +44,7 @@ def make_csv(path):
             key="b" * 64,
             contact_name="NEV-Solidar-360☀️",
             repeater_name="LO-LOM-BULP",
-            firmware_version="v1.17.0",
+            firmware_version="v1.15.0",
             uptime_seconds=100,
             tx_airtime_seconds=10,
             rx_airtime_seconds=5,
@@ -136,5 +137,22 @@ def test_export_xlsx_styles_and_formats(tmp_path):
     date_cell = sheet.cell(2, col["last_advert_utc"])
     assert isinstance(date_cell.value, datetime)
     assert "yyyy-mm-dd" in date_cell.number_format
-    assert "%" in sheet.cell(2, col["tx_airtime_pct"]).number_format
+    percent_cell = sheet.cell(2, col["tx_airtime_pct"])
+    assert abs(percent_cell.value - 0.1) < 1e-9
+    assert percent_cell.number_format == "0.00%"
     assert sheet.cell(2, col["neighbours_count"]).number_format == "0"
+
+
+@pytest.mark.parametrize(
+    ("version", "expected"),
+    [
+        ("v1.15.0", True),
+        ("v1.15.9-deadbeef", True),
+        ("v1.16.0", False),
+        ("v1.17.1-pr2343", False),
+        ("v1.18.0-81dbae5", False),
+        ("старая (FW < 1.12)", True),
+    ],
+)
+def test_firmware_is_old_threshold(version, expected):
+    assert _firmware_is_old(version) is expected

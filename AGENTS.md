@@ -56,9 +56,9 @@ factory plus CLI/config/docs (see `meshcore.MeshCore.create_ble/create_tcp`).
   Stop on the first success. **Admin is never hunted deliberately**; if a
   password happens to give admin, use it. A saved `login_password=admin`
   from an existing report is still tried first.
-- Empty-password success is labelled `login_method=empty`. This can mean
-  either an ACL match or an empty guest password; firmware does not
-  distinguish them. The legacy label `acl` is migrated to `empty` on load.
+- Empty-password success is labelled `login_method=empty` internally in logs.
+  This can mean either an ACL match or an empty guest password; firmware does
+  not distinguish them. `login_method` is not a CSV column.
 - Login timeout and every radio request use the same `--timeout`, default
   **15 s**. There is no separate request timeout.
 - Every post-login request is attempted up to **5 times**
@@ -113,7 +113,7 @@ Column order:
 repeater_key;contact_name;last_advert_utc;firmware_version;repeater_name;
 owner_info;uptime;tx_airtime_pct;rx_airtime_pct;login_time_utc;
 clock_skew_sec;clock_status;neighbours_count;noise_floor_dbm;
-debug_flags;is_admin;login_password;login_method;login_attempts_last;
+debug_flags;is_admin;login_password;login_attempts_last;
 login_attempts_total;status;error
 ```
 
@@ -167,10 +167,12 @@ login_attempts_total;status;error
 - `--input CSV --export-xlsx XLSX` is an export-only mode; no radio connection.
 - Styling: dark header, gray/bold key column, green `ok`/`ok_old`, yellow
   `partial`, red error statuses with white text, very light red error rows.
-- Red text: old dates (>10 days from now), old firmware (<1.18 or `старая`),
+- Red text: old dates (>10 days from now), old firmware (<1.16 or `старая`),
   `clock_status != ok`, invalid `contact_name`/`repeater_name`.
 - Orange text: `noise_floor_dbm == -120`, `debug_flags != 0`.
 - Auto column widths, date/percent/number formats, freeze panes, autofilter.
+- Percentages are written as real numeric fractions (`0.1234`) with the
+  `0.00%` format, so the CSV comma decimal separator does not leak into XLSX.
 - Name validation: city ≥2 blocks, region `LO` + 3-char code ≥3 blocks; ASCII
   letters/digits/`-`/`_` plus `☀`/`☀️`.
 

@@ -75,7 +75,6 @@ def test_new_file_is_excel_friendly_and_has_expected_order(tmp_path):
     assert row["clock_status"] == "ok"
     assert row["is_admin"] == "yes"
     assert row["login_password"] == "admin"
-    assert row["login_method"] == "password"
 
 
 def test_failed_poll_preserves_previous_measurements(tmp_path):
@@ -132,7 +131,6 @@ def test_failed_poll_preserves_previous_measurements(tmp_path):
     assert row["debug_flags"] == "1"
     assert row["is_admin"] == "no"
     assert row["login_password"] == "guest"
-    assert row["login_method"] == "password"
     assert row["status"] == "login_failed"
     assert row["login_attempts_last"] == "15"
     assert row["login_attempts_total"] == "15"
@@ -306,19 +304,6 @@ def test_load_accepts_bom_and_missing_columns(tmp_path):
     assert row["contact_name"] == "Old Name"
     assert row["status"] == "ok"
     assert row["repeater_name"] == ""
-
-
-def test_load_migrates_legacy_acl_login_method(tmp_path):
-    path = tmp_path / "legacy.csv"
-    path.write_text(
-        "repeater_key;login_method;status\r\n" + "a" * 64 + ";acl;ok\r\n",
-        encoding="utf-8",
-    )
-
-    store = CsvStore(path)
-    store.load()
-
-    assert store.get("a" * 64)["login_method"] == "empty"
 
 
 def test_header_without_key_is_rejected(tmp_path):
