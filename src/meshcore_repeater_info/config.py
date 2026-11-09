@@ -14,6 +14,7 @@ class Config:
     force: bool
     alive: bool
     dead: bool
+    broken: bool
     only: str | None
     limit: int | None
     timeout: float

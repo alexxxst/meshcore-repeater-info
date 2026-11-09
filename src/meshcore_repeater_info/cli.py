@@ -60,6 +60,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="re-poll only repeaters without complete info; resets final_fail",
     )
+    retry_group.add_argument(
+        "--broken",
+        action="store_true",
+        help="re-poll only existing rows with partial/broken statuses; resets final_fail",
+    )
     parser.add_argument("--only", help="only one repeater by key prefix or name")
     parser.add_argument("--limit", type=int, help="maximum repeaters to poll")
     parser.add_argument(
@@ -115,6 +120,7 @@ def build_config(argv: list[str] | None = None) -> Config:
         force=args.force,
         alive=args.alive,
         dead=args.dead,
+        broken=args.broken,
         only=args.only,
         limit=args.limit,
         timeout=args.timeout,
@@ -210,6 +216,8 @@ async def run_inventory(
         mode = "alive"
     elif config.dead:
         mode = "dead"
+    elif config.broken:
+        mode = "broken"
     else:
         mode = "default"
 
@@ -222,11 +230,12 @@ async def run_inventory(
         if not should_process(existing, mode):
             summary.skipped += 1
             status = existing.get("status", "") if existing else ""
-            if mode == "alive":
+            if mode in {"alive", "broken"}:
                 logger.info(
-                    "skip %s (%s): not alive (%s)",
+                    "skip %s (%s): not %s (%s)",
                     contact_name,
                     key[:12],
+                    mode,
                     status or "no row",
                 )
             elif status == "final_fail" and mode != "dead":
@@ -251,7 +260,7 @@ async def run_inventory(
         store.ensure_row(
             key,
             contact_name,
-            reset_total=config.force or config.dead,
+            reset_total=config.force or config.dead or config.broken,
         )
         existing = store.get(key) or {}
         try:

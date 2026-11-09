@@ -22,6 +22,7 @@ def make_config(output, **overrides) -> Config:
         "force": False,
         "alive": False,
         "dead": False,
+        "broken": False,
         "only": None,
         "limit": None,
         "timeout": 15.0,
@@ -204,6 +205,47 @@ async def test_dead_mode_repolls_failed_and_new_and_resets_final_fail(tmp_path):
     assert session.login_contacts == ["b" * 64, "c" * 64]
     assert store.get("b" * 64)["status"] == "ok"
     assert store.get("b" * 64)["login_attempts_total"] == "0"
+
+
+@pytest.mark.asyncio
+async def test_broken_mode_repolls_existing_broken_rows_only(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(PollResult(key="a" * 64, contact_name="Alpha", status="ok"))
+    store.apply_result(
+        PollResult(key="b" * 64, contact_name="Beta", status="timeout")
+    )
+    store.apply_result(
+        PollResult(
+            key="c" * 64,
+            contact_name="Gamma",
+            status="final_fail",
+            login_attempts_total=35,
+        )
+    )
+    session = FakeSession(
+        [
+            contact("a", "Alpha"),
+            contact("b", "Beta"),
+            contact("c", "Gamma"),
+            contact("d", "Delta"),
+        ]
+    )
+
+    summary = await run_inventory(
+        make_config(path, broken=True),
+        session,
+        store,
+        poller=make_poller(session, store),
+    )
+
+    assert summary.polled == 2
+    assert summary.skipped == 2
+    assert session.login_contacts == ["b" * 64, "c" * 64]
+    assert store.get("c" * 64)["status"] == "ok"
+    assert store.get("c" * 64)["login_attempts_total"] == "0"
+    assert store.get("d" * 64) is None
 
 
 @pytest.mark.asyncio

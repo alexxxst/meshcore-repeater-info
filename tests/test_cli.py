@@ -18,6 +18,7 @@ def test_parser_defaults():
     assert config.force is False
     assert config.alive is False
     assert config.dead is False
+    assert config.broken is False
     assert config.timeout == 15.0
     assert config.min_delay == 2.0
     assert config.max_delay == 4.0
@@ -83,11 +84,19 @@ def test_parser_custom_values():
 def test_parser_alive_and_dead_modes():
     assert build_config(["--alive"]).alive is True
     assert build_config(["--dead"]).dead is True
+    assert build_config(["--broken"]).broken is True
 
 
 @pytest.mark.parametrize(
     "argv",
-    [["--alive", "--dead"], ["--force", "--alive"], ["--force", "--dead"]],
+    [
+        ["--alive", "--dead"],
+        ["--alive", "--broken"],
+        ["--dead", "--broken"],
+        ["--force", "--alive"],
+        ["--force", "--dead"],
+        ["--force", "--broken"],
+    ],
 )
 def test_parser_retry_modes_are_mutually_exclusive(argv):
     with pytest.raises(SystemExit):

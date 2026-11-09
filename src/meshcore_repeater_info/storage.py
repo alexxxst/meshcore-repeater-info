@@ -61,6 +61,8 @@ def should_process(row: dict[str, str] | None, mode: str) -> bool:
         return row is not None and status in ALIVE_STATUSES
     if mode == "dead":
         return row is None or status not in ALIVE_STATUSES
+    if mode == "broken":
+        return row is not None and status not in ALIVE_STATUSES
     return row is None or status not in SKIPPABLE_STATUSES
 
 

@@ -21,6 +21,7 @@ uv run meshcore-repeater-info --list-ports
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 -o repeaters.csv
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --alive
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --dead
+uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --broken
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --force
 ```
 
@@ -132,8 +133,10 @@ login_attempts_total;status;error
 - `--dead`: poll only rows without complete info (`partial`,
   `login_failed`, `timeout`, `error`, `final_fail`, `in_progress`) and new
   contacts; reset login counter and `final_fail`.
+- `--broken`: same as `--dead`, but only for **existing rows**; new contacts
+  are not added. Useful for retrying only known broken/partial records.
 - `--force`: poll everything, reset counters and `final_fail`.
-- `--alive`, `--dead`, `--force` are mutually exclusive.
+- `--alive`, `--dead`, `--broken`, `--force` are mutually exclusive.
 - `--limit N` counts actual polls after skips.
 
 ## Repository hygiene
