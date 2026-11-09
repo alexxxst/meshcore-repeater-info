@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import Config
+from .formatting import format_utc, parse_utc
 from .mesh import MeshCoreSession
 from .model import PollResult
 from .poller import PollConfig, Poller
@@ -42,6 +43,27 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("repeaters.csv"),
         help="CSV report path (default: repeaters.csv)",
+    )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        help="CSV file to export from (defaults to --output)",
+    )
+    parser.add_argument(
+        "--export-xlsx",
+        type=Path,
+        help="export the CSV to a styled XLSX file and exit",
+    )
+    parser.add_argument(
+        "--loop",
+        action="store_true",
+        help="repeat the full inventory forever until Ctrl+C",
+    )
+    parser.add_argument(
+        "--loop-interval",
+        type=float,
+        default=60.0,
+        help="seconds to wait between loop passes (default: 60)",
     )
     retry_group = parser.add_mutually_exclusive_group()
     retry_group.add_argument(
@@ -104,6 +126,8 @@ def build_config(argv: list[str] | None = None) -> Config:
         parser.error("--max-delay must be >= --min-delay")
     if args.timeout <= 0:
         parser.error("--timeout must be > 0")
+    if args.loop_interval <= 0:
+        parser.error("--loop-interval must be > 0")
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be >= 1")
     if args.max_login_attempts < 1:
@@ -117,6 +141,10 @@ def build_config(argv: list[str] | None = None) -> Config:
         port=args.port,
         baudrate=args.baudrate,
         output=args.output,
+        input=args.input,
+        export_xlsx=args.export_xlsx,
+        loop=args.loop,
+        loop_interval=args.loop_interval,
         force=args.force,
         alive=args.alive,
         dead=args.dead,
@@ -187,6 +215,14 @@ def _log_poll_result(result: PollResult) -> None:
         )
 
 
+def _advert_is_newer(contact: dict, row: dict[str, str]) -> bool:
+    contact_ts = contact.get("last_advert")
+    if not isinstance(contact_ts, (int, float)) or contact_ts <= 0:
+        return False
+    row_ts = parse_utc(row.get("last_advert_utc"))
+    return row_ts is None or int(contact_ts) > row_ts
+
+
 async def run_inventory(
     config: Config,
     session,
@@ -226,8 +262,17 @@ async def run_inventory(
         key = contact["public_key"].lower()
         contact_name = contact.get("adv_name", "")
         existing = store.get(key)
+        process = should_process(existing, mode)
+        fresh_advert = bool(
+            config.loop and existing is not None and _advert_is_newer(contact, existing)
+        )
+        # In the default loop mode a fresh advert can promote an otherwise
+        # skipped ok/final_fail row. In explicit alive/broken/dead modes the
+        # selected mode still wins.
+        if mode == "default" and fresh_advert:
+            process = True
 
-        if not should_process(existing, mode):
+        if not process:
             summary.skipped += 1
             status = existing.get("status", "") if existing else ""
             if mode in {"alive", "broken"}:
@@ -257,10 +302,23 @@ async def run_inventory(
         if config.limit is not None and summary.polled >= config.limit:
             break
 
+        if fresh_advert:
+            logger.info(
+                "%s: advert is newer (%s -> %s), resetting attempts and re-polling",
+                contact_name,
+                existing.get("last_advert_utc") or "?",
+                format_utc(int(contact["last_advert"])),
+            )
+
         store.ensure_row(
             key,
             contact_name,
-            reset_total=config.force or config.dead or config.broken,
+            reset_total=(
+                config.force
+                or config.dead
+                or config.broken
+                or fresh_advert
+            ),
         )
         existing = store.get(key) or {}
         try:
@@ -297,17 +355,86 @@ def _setup_logging(debug: bool) -> None:
     )
 
 
+async def _run_loop(
+    config: Config,
+    store: CsvStore,
+    connect,
+    sleep=asyncio.sleep,
+    max_passes: int | None = None,
+) -> None:
+    """Run inventory passes until interrupted (or max_passes in tests)."""
+    pass_no = 0
+    session = None
+    try:
+        while max_passes is None or pass_no < max_passes:
+            pass_no += 1
+            started = time.monotonic()
+            try:
+                if session is None:
+                    logger.info("Connecting to Companion ...")
+                    session = await connect()
+                summary = await run_inventory(config, session, store)
+                elapsed = time.monotonic() - started
+                details = ", ".join(
+                    f"{status}={count}"
+                    for status, count in sorted(summary.statuses.items())
+                )
+                logger.info(
+                    "Pass %s done in %.0f s: polled=%s skipped=%s%s",
+                    pass_no,
+                    elapsed,
+                    summary.polled,
+                    summary.skipped,
+                    f" ({details})" if details else "",
+                )
+            except (CsvFormatError, ValueError):
+                raise
+            except Exception:
+                logger.exception("Inventory pass %s failed; will retry", pass_no)
+                if session is not None:
+                    try:
+                        await session.close()
+                    except Exception:
+                        pass
+                    session = None
+
+            if max_passes is not None and pass_no >= max_passes:
+                break
+            logger.info("Waiting %.0f s until the next pass...", config.loop_interval)
+            await sleep(config.loop_interval)
+    finally:
+        if session is not None:
+            await session.close()
+
+
 async def _async_main(config: Config) -> int:
     if config.list_ports:
         print(format_ports(discover_ports()))
+        return 0
+
+    if config.export_xlsx:
+        from .export_xlsx import export_csv_to_xlsx
+
+        input_path = config.input or config.output
+        export_csv_to_xlsx(input_path, config.export_xlsx)
+        logger.info("Exported %s to %s", input_path, config.export_xlsx)
         return 0
 
     port = config.port or select_port(discover_ports())
     store = CsvStore(config.output)
     store.load()
 
+    async def connect():
+        return await MeshCoreSession.connect(
+            port, config.baudrate, config.debug
+        )
+
+    if config.loop:
+        await _run_loop(config, store, connect)
+        return 0
+
     logger.info("Connecting to Companion on %s ...", port)
-    session = await MeshCoreSession.connect(port, config.baudrate, config.debug)
+    session = await connect()
     started = time.monotonic()
     try:
         summary = await run_inventory(config, session, store)

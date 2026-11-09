@@ -227,6 +227,68 @@ def test_should_process_modes(status, mode, expected):
     assert should_process(row, mode) is expected
 
 
+def test_write_keeps_previous_version_in_backup(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+
+    store.apply_result(
+        PollResult(key="a" * 64, contact_name="Alpha", status="ok")
+    )
+    first_version = path.read_bytes()
+
+    store.apply_result(
+        PollResult(key="b" * 64, contact_name="Beta", status="ok")
+    )
+
+    assert store.backup_path.exists()
+    assert store.backup_path.read_bytes() == first_version
+    assert path.read_bytes() != first_version
+
+
+def test_load_recovers_from_backup_when_main_is_corrupt(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(
+        PollResult(key="a" * 64, contact_name="Alpha", status="ok")
+    )
+    store.apply_result(
+        PollResult(key="b" * 64, contact_name="Beta", status="ok")
+    )
+
+    path.write_bytes(b"this is not a csv")
+
+    recovered = CsvStore(path)
+    recovered.load()
+
+    assert recovered.get("a" * 64) is not None
+    assert recovered.get("b" * 64) is None
+    assert path.read_bytes() == recovered.backup_path.read_bytes()
+
+
+def test_load_rejects_corrupt_main_and_backup(tmp_path):
+    path = tmp_path / "report.csv"
+    backup = path.with_name(path.name + ".bak")
+    path.write_bytes(b"broken")
+    backup.write_bytes(b"also broken")
+
+    with pytest.raises(CsvFormatError):
+        CsvStore(path).load()
+
+
+def test_all_stored_values_are_strings(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.ensure_row("a" * 64, "Alpha", reset_total=False)
+
+    row = store.get("a" * 64)
+    assert all(isinstance(value, str) for value in row.values())
+    assert row["owner_info"] == ""
+    assert row["login_password"] == ""
+
+
 def test_load_accepts_bom_and_missing_columns(tmp_path):
     path = tmp_path / "old.csv"
     path.write_bytes(

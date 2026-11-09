@@ -19,6 +19,10 @@ def test_parser_defaults():
     assert config.alive is False
     assert config.dead is False
     assert config.broken is False
+    assert config.input is None
+    assert config.export_xlsx is None
+    assert config.loop is False
+    assert config.loop_interval == 60.0
     assert config.timeout == 15.0
     assert config.min_delay == 2.0
     assert config.max_delay == 4.0
@@ -43,6 +47,13 @@ def test_parser_custom_values():
             "/dev/cu.usbmodem1101",
             "--output",
             "out.csv",
+            "--input",
+            "in.csv",
+            "--export-xlsx",
+            "out.xlsx",
+            "--loop",
+            "--loop-interval",
+            "30",
             "--force",
             "--only",
             "rep",
@@ -68,6 +79,10 @@ def test_parser_custom_values():
 
     assert config.port == "/dev/cu.usbmodem1101"
     assert config.output == Path("out.csv")
+    assert config.input == Path("in.csv")
+    assert config.export_xlsx == Path("out.xlsx")
+    assert config.loop is True
+    assert config.loop_interval == 30.0
     assert config.force is True
     assert config.only == "rep"
     assert config.limit == 1
@@ -101,6 +116,11 @@ def test_parser_alive_and_dead_modes():
 def test_parser_retry_modes_are_mutually_exclusive(argv):
     with pytest.raises(SystemExit):
         build_config(argv)
+
+
+def test_parser_rejects_non_positive_loop_interval():
+    with pytest.raises(SystemExit):
+        build_config(["--loop-interval", "0"])
 
 
 def test_parser_rejects_reversed_delays():

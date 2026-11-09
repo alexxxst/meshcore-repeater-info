@@ -6,4 +6,6 @@ __pycache__/
 *.tmp
 *.log
 *.csv
+*.csv.bak
+*.xlsx
 .DS_Store

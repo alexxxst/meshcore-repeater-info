@@ -23,6 +23,8 @@ uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --alive
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --dead
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --broken
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --force
+uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --loop
+uv run meshcore-repeater-info --input repeaters.csv --export-xlsx repeaters.xlsx
 ```
 
 When testing on real hardware, the user's rule is: **do not poll more than
@@ -138,6 +140,38 @@ login_attempts_total;status;error
 - `--force`: poll everything, reset counters and `final_fail`.
 - `--alive`, `--dead`, `--broken`, `--force` are mutually exclusive.
 - `--limit N` counts actual polls after skips.
+
+## Loop mode
+
+- `--loop` repeats full passes until Ctrl+C; `--loop-interval` defaults to 60 s.
+- Each pass re-fetches contacts, so new adverts/repeaters are picked up.
+- If `contact.last_advert` is newer than the row's `last_advert_utc`,
+  `login_attempts_total` is reset and the repeater is polled again with its
+  known password/ACL. In explicit `--alive`/`--broken` modes only rows selected
+  by that mode are re-polled; in default loop mode a fresh advert can promote
+  an `ok`/`final_fail` row.
+- On connection/pass failure the loop logs, closes, waits, and reconnects.
+
+## Backups and validation
+
+- Every write validates the temp CSV, keeps the previous valid version in
+  `repeaters.csv.bak`, atomically replaces the main file and validates it again.
+- On load, if the main file is corrupt/empty and `.bak` is valid, the backup is
+  restored. Duplicate keys / missing `repeater_key` are invalid.
+- `owner_info` and `login_password` are always stored as strings (empty string
+  when absent).
+
+## XLSX export
+
+- `--input CSV --export-xlsx XLSX` is an export-only mode; no radio connection.
+- Styling: dark header, gray/bold key column, green `ok`/`ok_old`, yellow
+  `partial`, red error statuses with white text, very light red error rows.
+- Red text: old dates (>10 days from now), old firmware (<1.18 or `старая`),
+  `clock_status != ok`, invalid `contact_name`/`repeater_name`.
+- Orange text: `noise_floor_dbm == -120`, `debug_flags != 0`.
+- Auto column widths, date/percent/number formats, freeze panes, autofilter.
+- Name validation: city ≥2 blocks, region `LO` + 3-char code ≥3 blocks; ASCII
+  letters/digits/`-`/`_` plus `☀`/`☀️`.
 
 ## Repository hygiene
 

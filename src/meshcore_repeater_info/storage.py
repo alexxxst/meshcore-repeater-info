@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import logging
 import os
 from pathlib import Path
 
@@ -43,6 +44,9 @@ ALIVE_STATUSES = {"ok", "ok_old"}
 SKIPPABLE_STATUSES = ALIVE_STATUSES | {"final_fail"}
 
 
+logger = logging.getLogger(__name__)
+
+
 class CsvFormatError(RuntimeError):
     """Raised when an existing report has an incompatible header."""
 
@@ -81,21 +85,38 @@ class CsvStore:
 
     def __init__(self, path: Path):
         self.path = path
+        self.backup_path = path.with_name(path.name + ".bak")
         self.rows: dict[str, dict[str, str]] = {}
 
-    def load(self) -> None:
-        self.rows = {}
-        if not self.path.exists():
-            return
+    def _validate_path(self, path: Path) -> bool:
+        if not path.exists() or path.stat().st_size == 0:
+            return False
+        try:
+            with path.open("r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle, delimiter=";")
+                fieldnames = [name.strip() for name in (reader.fieldnames or [])]
+                reader.fieldnames = fieldnames
+                if "repeater_key" not in fieldnames:
+                    return False
+                seen: set[str] = set()
+                for raw in reader:
+                    if None in raw:
+                        return False
+                    key = (raw.get("repeater_key") or "").strip().lower()
+                    if not key or key in seen:
+                        return False
+                    seen.add(key)
+            return True
+        except (OSError, UnicodeError, csv.Error):
+            return False
 
-        with self.path.open("r", encoding="utf-8-sig", newline="") as handle:
+    def _read_rows(self, path: Path) -> dict[str, dict[str, str]]:
+        rows: dict[str, dict[str, str]] = {}
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle, delimiter=";")
-            fieldnames = [name.strip() for name in (reader.fieldnames or [])]
-            reader.fieldnames = fieldnames
-            if "repeater_key" not in fieldnames:
-                raise CsvFormatError(
-                    f"{self.path} has no repeater_key column; refusing to overwrite it"
-                )
+            reader.fieldnames = [
+                name.strip() for name in (reader.fieldnames or [])
+            ]
             for raw in reader:
                 key = (raw.get("repeater_key") or "").strip().lower()
                 if not key:
@@ -105,7 +126,41 @@ class CsvStore:
                 # Older reports used "acl" for any empty-password login.
                 if row.get("login_method") == "acl":
                     row["login_method"] = "empty"
-                self.rows[key] = row
+                rows[key] = row
+        return rows
+
+    def load(self) -> None:
+        self.rows = {}
+        if self.path.exists() and self.path.stat().st_size == 0:
+            if self._validate_path(self.backup_path):
+                logger.warning(
+                    "%s is empty; restoring previous version from %s",
+                    self.path,
+                    self.backup_path,
+                )
+                self._atomic_copy(self.backup_path, self.path)
+                self.rows = self._read_rows(self.path)
+                return
+            return  # a brand-new empty report
+
+        if self._validate_path(self.path):
+            self.rows = self._read_rows(self.path)
+            return
+
+        if self._validate_path(self.backup_path):
+            logger.warning(
+                "%s is invalid; restoring previous version from %s",
+                self.path,
+                self.backup_path,
+            )
+            self._atomic_copy(self.backup_path, self.path)
+            self.rows = self._read_rows(self.path)
+            return
+
+        if self.path.exists():
+            raise CsvFormatError(
+                f"{self.path} is not a valid report and no valid backup exists"
+            )
 
     def get(self, key: str) -> dict[str, str] | None:
         return self.rows.get(key.lower())
@@ -147,8 +202,8 @@ class CsvStore:
         row["login_attempts_total"] = "0"
         row["login_attempts_last"] = str(last)
         row["is_admin"] = "yes" if is_admin else "no"
-        row["login_password"] = login_password
-        row["login_method"] = login_method
+        row["login_password"] = str(login_password)
+        row["login_method"] = str(login_method)
         row["status"] = "in_progress"
         row["error"] = ""
         self._write()
@@ -156,16 +211,16 @@ class CsvStore:
     def apply_result(self, result: PollResult) -> None:
         row = self._row_for_update(result.key)
         row["repeater_key"] = result.key.lower()
-        row["contact_name"] = result.contact_name
+        row["contact_name"] = str(result.contact_name)
 
         if result.repeater_name is not None:
-            row["repeater_name"] = result.repeater_name
+            row["repeater_name"] = str(result.repeater_name)
         if result.advert_timestamp is not None:
             row["last_advert_utc"] = format_utc(result.advert_timestamp)
         if result.firmware_version is not None:
-            row["firmware_version"] = result.firmware_version
+            row["firmware_version"] = str(result.firmware_version)
         if result.owner_info is not None:
-            row["owner_info"] = _clean_owner_info(result.owner_info)
+            row["owner_info"] = _clean_owner_info(str(result.owner_info))
 
         if result.uptime_seconds is not None:
             row["uptime"] = format_uptime(result.uptime_seconds)
@@ -195,14 +250,14 @@ class CsvStore:
         if result.is_admin is not None:
             row["is_admin"] = "yes" if result.is_admin else "no"
         if result.login_password is not None:
-            row["login_password"] = result.login_password
+            row["login_password"] = str(result.login_password)
         if result.login_method is not None:
-            row["login_method"] = result.login_method
+            row["login_method"] = str(result.login_method)
 
         row["login_attempts_last"] = str(result.login_attempts_last)
         row["login_attempts_total"] = str(result.login_attempts_total)
-        row["status"] = result.status
-        row["error"] = result.error or ""
+        row["status"] = str(result.status)
+        row["error"] = str(result.error or "")
         self._write()
 
     def _row_for_update(self, key: str) -> dict[str, str]:
@@ -214,23 +269,55 @@ class CsvStore:
             self.rows[key] = row
         return row
 
+    def _atomic_copy(self, source: Path, destination: Path) -> None:
+        data = source.read_bytes()
+        temp_path = destination.with_name(destination.name + ".tmp")
+        try:
+            with temp_path.open("wb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, destination)
+        finally:
+            temp_path.unlink(missing_ok=True)
+
     def _write(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temp_path = self.path.with_name(self.path.name + ".tmp")
-        with temp_path.open("w", encoding="utf-8-sig", newline="") as handle:
-            writer = csv.DictWriter(
-                handle,
-                fieldnames=FIELDS,
-                delimiter=";",
-                lineterminator="\r\n",
-                quoting=csv.QUOTE_MINIMAL,
-                extrasaction="ignore",
-            )
-            writer.writeheader()
-            writer.writerows(self.rows.values())
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temp_path, self.path)
+        try:
+            with temp_path.open("w", encoding="utf-8-sig", newline="") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=FIELDS,
+                    delimiter=";",
+                    lineterminator="\r\n",
+                    quoting=csv.QUOTE_MINIMAL,
+                    extrasaction="ignore",
+                )
+                writer.writeheader()
+                writer.writerows(self.rows.values())
+                handle.flush()
+                os.fsync(handle.fileno())
+
+            if not self._validate_path(temp_path):
+                raise CsvFormatError(f"New report {temp_path} failed validation")
+
+            # Keep exactly one previous valid version.
+            if self._validate_path(self.path):
+                self._atomic_copy(self.path, self.backup_path)
+
+            os.replace(temp_path, self.path)
+            if not self._validate_path(self.path):
+                if self._validate_path(self.backup_path):
+                    self._atomic_copy(self.backup_path, self.path)
+                raise CsvFormatError(
+                    f"Report {self.path} failed validation after writing"
+                )
+            self._fsync_dir()
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+    def _fsync_dir(self) -> None:
         try:
             dir_fd = os.open(self.path.parent, os.O_RDONLY)
             try:

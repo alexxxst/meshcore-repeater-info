@@ -2,7 +2,8 @@ import random
 
 import pytest
 
-from meshcore_repeater_info.cli import run_inventory
+from meshcore_repeater_info.cli import _async_main, _run_loop, run_inventory
+from meshcore_repeater_info.formatting import format_utc
 from meshcore_repeater_info.config import Config
 from meshcore_repeater_info.mesh import LoginOutcome, OwnerInfo, StatusInfo
 from meshcore_repeater_info.model import PollResult
@@ -19,6 +20,10 @@ def make_config(output, **overrides) -> Config:
         "port": None,
         "baudrate": 115_200,
         "output": output,
+        "input": None,
+        "export_xlsx": None,
+        "loop": False,
+        "loop_interval": 60.0,
         "force": False,
         "alive": False,
         "dead": False,
@@ -246,6 +251,168 @@ async def test_broken_mode_repolls_existing_broken_rows_only(tmp_path):
     assert store.get("c" * 64)["status"] == "ok"
     assert store.get("c" * 64)["login_attempts_total"] == "0"
     assert store.get("d" * 64) is None
+
+
+@pytest.mark.asyncio
+async def test_export_mode_does_not_connect_to_radio(tmp_path):
+    csv_path = tmp_path / "report.csv"
+    xlsx_path = tmp_path / "report.xlsx"
+    store = CsvStore(csv_path)
+    store.load()
+    store.apply_result(
+        PollResult(key="a" * 64, contact_name="Alpha", status="ok")
+    )
+
+    code = await _async_main(
+        make_config(
+            csv_path,
+            input=csv_path,
+            export_xlsx=xlsx_path,
+        )
+    )
+
+    assert code == 0
+    assert xlsx_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_run_loop_makes_passes_and_sleeps_between_them(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    session = FakeSession([contact("a", "Alpha")])
+    connects = 0
+    sleeps: list[float] = []
+
+    async def connect():
+        nonlocal connects
+        connects += 1
+        return session
+
+    async def sleep(seconds):
+        sleeps.append(seconds)
+
+    await _run_loop(
+        make_config(path, loop=True, loop_interval=60),
+        store,
+        connect,
+        sleep=sleep,
+        max_passes=2,
+    )
+
+    assert connects == 1
+    assert sleeps == [60]
+    assert session.login_contacts == ["a" * 64]
+    assert store.get("a" * 64)["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_loop_repolls_ok_repeater_when_advert_is_newer(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(
+        PollResult(
+            key="a" * 64,
+            contact_name="Alpha",
+            status="ok",
+            advert_timestamp=1_000,
+        )
+    )
+    session = FakeSession([{**contact("a", "Alpha"), "last_advert": 2_000}])
+
+    summary = await run_inventory(
+        make_config(path, loop=True),
+        session,
+        store,
+        poller=make_poller(session, store),
+    )
+
+    assert summary.polled == 1
+    assert session.login_contacts == ["a" * 64]
+    assert store.get("a" * 64)["last_advert_utc"] == format_utc(2_000)
+
+
+@pytest.mark.asyncio
+async def test_loop_skips_ok_repeater_when_advert_is_older(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(
+        PollResult(
+            key="a" * 64,
+            contact_name="Alpha",
+            status="ok",
+            advert_timestamp=2_000,
+        )
+    )
+    session = FakeSession([{**contact("a", "Alpha"), "last_advert": 1_000}])
+
+    summary = await run_inventory(
+        make_config(path, loop=True),
+        session,
+        store,
+        poller=make_poller(session, store),
+    )
+
+    assert summary.polled == 0
+    assert summary.skipped == 1
+    assert session.login_contacts == []
+
+
+@pytest.mark.asyncio
+async def test_loop_alive_mode_does_not_promote_broken_rows(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(
+        PollResult(
+            key="b" * 64,
+            contact_name="Beta",
+            status="timeout",
+            advert_timestamp=1_000,
+        )
+    )
+    session = FakeSession([{**contact("b", "Beta"), "last_advert": 2_000}])
+
+    summary = await run_inventory(
+        make_config(path, loop=True, alive=True),
+        session,
+        store,
+        poller=make_poller(session, store),
+    )
+
+    assert summary.polled == 0
+    assert summary.skipped == 1
+
+
+@pytest.mark.asyncio
+async def test_loop_broken_mode_repolls_final_fail_with_newer_advert(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(
+        PollResult(
+            key="c" * 64,
+            contact_name="Gamma",
+            status="final_fail",
+            login_attempts_total=35,
+            advert_timestamp=1_000,
+        )
+    )
+    session = FakeSession([{**contact("c", "Gamma"), "last_advert": 2_000}])
+
+    summary = await run_inventory(
+        make_config(path, loop=True, broken=True),
+        session,
+        store,
+        poller=make_poller(session, store),
+    )
+
+    assert summary.polled == 1
+    assert session.login_contacts == ["c" * 64]
+    assert store.get("c" * 64)["status"] == "ok"
+    assert store.get("c" * 64)["login_attempts_total"] == "0"
 
 
 @pytest.mark.asyncio

@@ -11,6 +11,10 @@ class Config:
     port: str | None
     baudrate: int
     output: Path
+    input: Path | None
+    export_xlsx: Path | None
+    loop: bool
+    loop_interval: float
     force: bool
     alive: bool
     dead: bool

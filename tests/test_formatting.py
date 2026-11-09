@@ -6,6 +6,7 @@ from meshcore_repeater_info.formatting import (
     format_percent,
     format_uptime,
     format_utc,
+    parse_utc,
 )
 
 
@@ -69,6 +70,20 @@ def test_format_utc(timestamp, expected):
 )
 def test_clock_status(skew, threshold, expected):
     assert clock_status(skew, threshold) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("1970-01-01 00:00:00", 0),
+        ("2023-11-14 22:13:20", 1_700_000_000),
+        ("", None),
+        ("not a date", None),
+        (None, None),
+    ],
+)
+def test_parse_utc(value, expected):
+    assert parse_utc(value) == expected
 
 
 @pytest.mark.parametrize(

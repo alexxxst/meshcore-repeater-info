@@ -39,6 +39,17 @@ def format_utc(timestamp: int | None) -> str:
     return datetime.fromtimestamp(timestamp, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def parse_utc(value: str | None) -> int | None:
+    """Parse the report's UTC timestamp format back to a Unix timestamp."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError):
+        return None
+    return int(parsed.replace(tzinfo=timezone.utc).timestamp())
+
+
 def format_clock_skew(skew: int | None) -> str:
     """Return a signed integer as text, or an empty string when unknown."""
     return "" if skew is None else str(skew)
