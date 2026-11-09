@@ -52,9 +52,10 @@ factory plus CLI/config/docs (see `meshcore.MeshCore.create_ble/create_tcp`).
 
 - Contacts with `type == 2` (`ADV_TYPE_REPEATER`) are polled.
 - Login attempts: 3 × empty password, then 2 × each of
-  `123456`, `guest`, `1234`, `admin`, `1234567890`, `password`.
+  `123456`, `guest`, `password`, `1234`, `1234567890`.
   Stop on the first success. **Admin is never hunted deliberately**; if a
-  password happens to give admin, use it.
+  password happens to give admin, use it. A saved `login_password=admin`
+  from an existing report is still tried first.
 - Empty-password success is labelled `login_method=empty`. This can mean
   either an ACL match or an empty guest password; firmware does not
   distinguish them. The legacy label `acl` is migrated to `empty` on load.

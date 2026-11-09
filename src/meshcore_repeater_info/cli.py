@@ -20,7 +20,7 @@ from .storage import CsvFormatError, CsvStore, should_process
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PASSWORDS = ",123456,guest,1234,admin,1234567890,password"
+DEFAULT_PASSWORDS = ",123456,guest,password,1234,1234567890"
 
 
 def _parse_passwords(value: str) -> tuple[str, ...]:

@@ -190,11 +190,12 @@ def test_build_login_candidates_default_order_and_counts():
     assert candidates.count("") == 3
     assert candidates.count("123456") == 2
     assert candidates.count("guest") == 2
+    assert candidates[7:9] == ["password", "password"]
     assert candidates.count("1234") == 2
-    assert candidates.count("admin") == 2
+    assert "admin" not in candidates
     assert candidates.count("1234567890") == 2
     assert candidates.count("password") == 2
-    assert len(candidates) == 15
+    assert len(candidates) == 13
 
 
 def test_build_login_candidates_moves_saved_password_after_empty():
@@ -440,7 +441,7 @@ async def test_request_succeeds_on_fifth_attempt_without_touching_login_counter(
 async def test_admin_session_uses_remote_version_name_and_owner_fallbacks():
     session = FakeSession(
         {
-            "admin": LoginOutcome(
+            "password": LoginOutcome(
                 success=True, reason="ok", is_admin=True, fw_ver_level=2
             )
         },

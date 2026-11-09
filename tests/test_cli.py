@@ -33,10 +33,9 @@ def test_parser_defaults():
         "",
         "123456",
         "guest",
-        "1234",
-        "admin",
-        "1234567890",
         "password",
+        "1234",
+        "1234567890",
     )
 
 
