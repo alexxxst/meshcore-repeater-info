@@ -146,11 +146,11 @@ login_attempts_total;status;error
 
 - `--loop` repeats full passes until Ctrl+C; `--loop-interval` defaults to 60 s.
 - Each pass re-fetches contacts, so new adverts/repeaters are picked up.
-- If `contact.last_advert` is newer than the row's `last_advert_utc`,
-  `login_attempts_total` is reset and the repeater is polled again with its
-  known password/ACL. In explicit `--alive`/`--broken` modes only rows selected
-  by that mode are re-polled; in default loop mode a fresh advert can promote
-  an `ok`/`final_fail` row.
+- If `contact.last_advert` is more than 24 hours newer than the row's
+  `last_advert_utc`, `login_attempts_total` is reset and the repeater is polled
+  again with its known password/ACL. In explicit `--alive`/`--broken` modes
+  only rows selected by that mode are re-polled; in default loop mode a fresh
+  advert can promote an `ok`/`final_fail` row.
 - On connection/pass failure the loop logs, closes, waits, and reconnects.
 
 ## Backups and validation

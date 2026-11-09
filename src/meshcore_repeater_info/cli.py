@@ -215,12 +215,15 @@ def _log_poll_result(result: PollResult) -> None:
         )
 
 
+ADVERT_REFRESH_SECONDS = 86_400
+
+
 def _advert_is_newer(contact: dict, row: dict[str, str]) -> bool:
     contact_ts = contact.get("last_advert")
     if not isinstance(contact_ts, (int, float)) or contact_ts <= 0:
         return False
     row_ts = parse_utc(row.get("last_advert_utc"))
-    return row_ts is None or int(contact_ts) > row_ts
+    return row_ts is None or int(contact_ts) > row_ts + ADVERT_REFRESH_SECONDS
 
 
 async def run_inventory(
@@ -304,7 +307,7 @@ async def run_inventory(
 
         if fresh_advert:
             logger.info(
-                "%s: advert is newer (%s -> %s), resetting attempts and re-polling",
+                "%s: advert is over a day newer (%s -> %s), resetting attempts and re-polling",
                 contact_name,
                 existing.get("last_advert_utc") or "?",
                 format_utc(int(contact["last_advert"])),

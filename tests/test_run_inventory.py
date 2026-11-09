@@ -307,7 +307,7 @@ async def test_run_loop_makes_passes_and_sleeps_between_them(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_loop_repolls_ok_repeater_when_advert_is_newer(tmp_path):
+async def test_loop_repolls_ok_repeater_when_advert_is_over_a_day_newer(tmp_path):
     path = tmp_path / "report.csv"
     store = CsvStore(path)
     store.load()
@@ -319,7 +319,8 @@ async def test_loop_repolls_ok_repeater_when_advert_is_newer(tmp_path):
             advert_timestamp=1_000,
         )
     )
-    session = FakeSession([{**contact("a", "Alpha"), "last_advert": 2_000}])
+    newer = 1_000 + 86_401
+    session = FakeSession([{**contact("a", "Alpha"), "last_advert": newer}])
 
     summary = await run_inventory(
         make_config(path, loop=True),
@@ -330,7 +331,34 @@ async def test_loop_repolls_ok_repeater_when_advert_is_newer(tmp_path):
 
     assert summary.polled == 1
     assert session.login_contacts == ["a" * 64]
-    assert store.get("a" * 64)["last_advert_utc"] == format_utc(2_000)
+    assert store.get("a" * 64)["last_advert_utc"] == format_utc(newer)
+
+
+@pytest.mark.asyncio
+async def test_loop_does_not_repoll_for_slightly_newer_advert(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(
+        PollResult(
+            key="a" * 64,
+            contact_name="Alpha",
+            status="ok",
+            advert_timestamp=1_000,
+        )
+    )
+    session = FakeSession([{**contact("a", "Alpha"), "last_advert": 1_000 + 3_600}])
+
+    summary = await run_inventory(
+        make_config(path, loop=True),
+        session,
+        store,
+        poller=make_poller(session, store),
+    )
+
+    assert summary.polled == 0
+    assert summary.skipped == 1
+    assert session.login_contacts == []
 
 
 @pytest.mark.asyncio
@@ -373,7 +401,7 @@ async def test_loop_alive_mode_does_not_promote_broken_rows(tmp_path):
             advert_timestamp=1_000,
         )
     )
-    session = FakeSession([{**contact("b", "Beta"), "last_advert": 2_000}])
+    session = FakeSession([{**contact("b", "Beta"), "last_advert": 87_401}])
 
     summary = await run_inventory(
         make_config(path, loop=True, alive=True),
@@ -400,7 +428,7 @@ async def test_loop_broken_mode_repolls_final_fail_with_newer_advert(tmp_path):
             advert_timestamp=1_000,
         )
     )
-    session = FakeSession([{**contact("c", "Gamma"), "last_advert": 2_000}])
+    session = FakeSession([{**contact("c", "Gamma"), "last_advert": 87_401}])
 
     summary = await run_inventory(
         make_config(path, loop=True, broken=True),
