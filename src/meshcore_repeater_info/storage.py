@@ -160,6 +160,15 @@ class CsvStore:
     def get(self, key: str) -> dict[str, str] | None:
         return self.rows.get(key.lower())
 
+    def remove(self, key: str) -> bool:
+        """Delete a row and persist the report. Returns True if it existed."""
+        key = key.lower()
+        if key not in self.rows:
+            return False
+        del self.rows[key]
+        self._write()
+        return True
+
     def ensure_row(self, key: str, contact_name: str, reset_total: bool) -> None:
         """Create a row before polling and optionally reset the attempt counter."""
         key = key.lower()

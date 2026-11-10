@@ -77,6 +77,18 @@ def make_csv(path):
     )
     store.apply_result(
         PollResult(
+            key="e" * 64,
+            contact_name="remove-me",
+            firmware_version="v1.18.0",
+            uptime_seconds=100,
+            advert_timestamp=NOW,
+            login_timestamp=NOW,
+            clock_status="ok",
+            status="ok",
+        )
+    )
+    store.apply_result(
+        PollResult(
             key="d" * 64,
             contact_name="Bad Name!",
             firmware_version="v1.18.0",
@@ -122,6 +134,11 @@ def test_export_xlsx_styles_and_formats(tmp_path):
     assert header[0] == "repeater_key"
     assert header[1] == "contact_name"
     assert "repeater_name" not in header
+    assert all(
+        cell.value != "remove-me"
+        for row in sheet.iter_rows()
+        for cell in row
+    )
     assert sheet.freeze_panes == "C2"
     assert sheet.auto_filter.ref is not None
     assert sheet.column_dimensions["A"].width > 20

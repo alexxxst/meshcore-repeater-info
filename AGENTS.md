@@ -51,6 +51,9 @@ factory plus CLI/config/docs (see `meshcore.MeshCore.create_ble/create_tcp`).
 ## Current behavior
 
 - Contacts with `type == 2` (`ADV_TYPE_REPEATER`) are polled.
+- If `contact_name` contains `remove` or `delete` (case-insensitive), the
+  repeater is skipped and its existing CSV row is deleted. XLSX export also
+  filters such rows out.
 - Login attempts: 3 × empty password, then 2 × each of
   `123456`, `guest`, `password`, `1234`, `1234567890`.
   Stop on the first success. **Admin is never hunted deliberately**; if a

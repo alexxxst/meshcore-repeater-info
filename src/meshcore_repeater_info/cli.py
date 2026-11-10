@@ -14,6 +14,7 @@ from .config import Config
 from .formatting import format_utc, parse_utc
 from .mesh import MeshCoreSession
 from .model import PollResult
+from .names import is_removed_repeater_name
 from .poller import PollConfig, Poller
 from .ports import PortError, discover_ports, format_ports, select_port
 from .storage import CsvFormatError, CsvStore, should_process
@@ -264,6 +265,16 @@ async def run_inventory(
     for contact in selected:
         key = contact["public_key"].lower()
         contact_name = contact.get("adv_name", "")
+        if is_removed_repeater_name(contact_name):
+            removed = store.remove(key)
+            summary.skipped += 1
+            logger.warning(
+                "skip %s (%s): name contains remove/delete%s",
+                contact_name,
+                key[:12],
+                "; row deleted" if removed else "",
+            )
+            continue
         existing = store.get(key)
         process = should_process(existing, mode)
         fresh_advert = bool(

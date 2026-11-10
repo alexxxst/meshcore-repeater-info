@@ -1,6 +1,9 @@
 import pytest
 
-from meshcore_repeater_info.names import is_valid_repeater_name
+from meshcore_repeater_info.names import (
+    is_removed_repeater_name,
+    is_valid_repeater_name,
+)
 
 
 @pytest.mark.parametrize(
@@ -52,3 +55,18 @@ def test_valid_repeater_names(name):
 )
 def test_invalid_repeater_names(name):
     assert is_valid_repeater_name(name) is False
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("remove-me", True),
+        ("Me-Remove", True),
+        ("DELETE-repeater", True),
+        ("my-deleted-node", True),
+        ("PDO-Strelna-NE", False),
+        ("", False),
+    ],
+)
+def test_removed_repeater_names(name, expected):
+    assert is_removed_repeater_name(name) is expected

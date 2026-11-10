@@ -8,6 +8,12 @@ _ALLOWED = re.compile(r"^[A-Za-z0-9_\-☀\uFE0F]+$")
 _CODE = re.compile(r"^[A-Z0-9]{3}$")
 
 
+def is_removed_repeater_name(name: str) -> bool:
+    """Return True for names explicitly marked for removal."""
+    lowered = (name or "").lower()
+    return "remove" in lowered or "delete" in lowered
+
+
 def is_valid_repeater_name(name: str) -> bool:
     """Return True when a name matches the city or region naming template.
 

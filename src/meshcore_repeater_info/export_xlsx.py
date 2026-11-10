@@ -10,7 +10,7 @@ from pathlib import Path
 import xlsxwriter
 
 from .formatting import parse_utc
-from .names import is_valid_repeater_name
+from .names import is_removed_repeater_name, is_valid_repeater_name
 from .storage import CsvStore, FIELDS
 
 HEADER_BG = "#1F4E78"
@@ -194,7 +194,11 @@ def export_csv_to_xlsx(
 
     store = CsvStore(csv_path)
     store.load()
-    rows = list(store.rows.values())
+    rows = [
+        row
+        for row in store.rows.values()
+        if not is_removed_repeater_name(row.get("contact_name", ""))
+    ]
     now = int(time.time()) if now is None else int(now)
 
     xlsx_path.parent.mkdir(parents=True, exist_ok=True)

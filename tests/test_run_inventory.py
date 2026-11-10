@@ -276,6 +276,31 @@ async def test_export_mode_does_not_connect_to_radio(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_remove_or_delete_names_are_skipped_and_rows_deleted(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(PollResult(key="a" * 64, contact_name="remove-me", status="ok"))
+    store.apply_result(PollResult(key="b" * 64, contact_name="Beta", status="timeout"))
+    session = FakeSession(
+        [contact("a", "REMOVE-me"), contact("b", "Beta")]
+    )
+
+    summary = await run_inventory(
+        make_config(path),
+        session,
+        store,
+        poller=make_poller(session, store),
+    )
+
+    assert store.get("a" * 64) is None
+    assert store.get("b" * 64) is not None
+    assert session.login_contacts == ["b" * 64]
+    assert summary.skipped == 1
+    assert summary.polled == 1
+
+
+@pytest.mark.asyncio
 async def test_run_loop_makes_passes_and_sleeps_between_them(tmp_path):
     path = tmp_path / "report.csv"
     store = CsvStore(path)

@@ -242,6 +242,24 @@ def test_write_keeps_previous_version_in_backup(tmp_path):
     assert path.read_bytes() != first_version
 
 
+def test_remove_deletes_row_and_keeps_backup(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(
+        PollResult(key="a" * 64, contact_name="Alpha", status="ok")
+    )
+    store.apply_result(
+        PollResult(key="b" * 64, contact_name="Beta", status="ok")
+    )
+
+    assert store.remove("a" * 64) is True
+    assert store.get("a" * 64) is None
+    assert store.get("b" * 64) is not None
+    assert store.backup_path.exists()
+    assert store.remove("missing" * 8) is False
+
+
 def test_load_recovers_from_backup_when_main_is_corrupt(tmp_path):
     path = tmp_path / "report.csv"
     store = CsvStore(path)
