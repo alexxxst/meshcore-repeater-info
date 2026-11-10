@@ -93,8 +93,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--timeout",
         type=float,
+        default=15.0,
+        help="timeout for every login packet (default: 15)",
+    )
+    parser.add_argument(
+        "--request-timeout",
+        type=float,
         default=25.0,
-        help="timeout for every login or radio request attempt (default: 25)",
+        help="timeout for requests after login (default: 25)",
     )
     parser.add_argument("--min-delay", type=float, default=20.0)
     parser.add_argument("--max-delay", type=float, default=30.0)
@@ -127,6 +133,8 @@ def build_config(argv: list[str] | None = None) -> Config:
         parser.error("--max-delay must be >= --min-delay")
     if args.timeout <= 0:
         parser.error("--timeout must be > 0")
+    if args.request_timeout <= 0:
+        parser.error("--request-timeout must be > 0")
     if args.loop_interval <= 0:
         parser.error("--loop-interval must be > 0")
     if args.limit is not None and args.limit < 1:
@@ -153,6 +161,7 @@ def build_config(argv: list[str] | None = None) -> Config:
         only=args.only,
         limit=args.limit,
         timeout=args.timeout,
+        request_timeout=args.request_timeout,
         min_delay=args.min_delay,
         max_delay=args.max_delay,
         clock_skew_threshold=args.clock_skew_threshold,
@@ -240,6 +249,7 @@ async def run_inventory(
             session=session,
             config=PollConfig(
                 timeout=config.timeout,
+                request_timeout=config.request_timeout,
                 min_delay=config.min_delay,
                 max_delay=config.max_delay,
                 clock_skew_threshold=config.clock_skew_threshold,

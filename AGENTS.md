@@ -62,8 +62,8 @@ factory plus CLI/config/docs (see `meshcore.MeshCore.create_ble/create_tcp`).
 - Empty-password success is labelled `login_method=empty` internally in logs.
   This can mean either an ACL match or an empty guest password; firmware does
   not distinguish them. `login_method` is not a CSV column.
-- Login timeout and every radio request use the same `--timeout`, default
-  **25 s**. There is no separate request timeout.
+- Login packets use `--timeout`, default **15 s**. Requests after login use
+  `--request-timeout`, default **25 s**.
 - Every post-login request is attempted up to **5 times**
   (`--request-attempts`, minimum 5). These retries do **not** increment the
   login counter.
@@ -197,5 +197,5 @@ login_attempts_total;status;error
 - A background process started with `&` from a non-interactive shell may
   inherit `SIGINT` ignored, so `kill -INT` will not stop it; use a foreground
   run/PTY or `SIGTERM` for test harnesses.
-- `--force` on a real repeater can take a long time because of 25 s timeouts,
-  20–30 s pauses and 5 request attempts.
+- `--force` on a real repeater can take a long time because of 15/25 s
+  timeouts, 20–30 s pauses and 5 request attempts.

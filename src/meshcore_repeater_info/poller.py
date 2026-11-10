@@ -26,7 +26,8 @@ DEFAULT_PASSWORDS = (
 
 @dataclass(frozen=True)
 class PollConfig:
-    timeout: float = 25.0
+    timeout: float = 15.0
+    request_timeout: float = 25.0
     min_delay: float = 20.0
     max_delay: float = 30.0
     clock_skew_threshold: int = 600
@@ -177,7 +178,7 @@ class Poller:
             if mode in (RouteMode.INITIAL_FLOOD, RouteMode.FLOOD):
                 used_flood = True
                 if not await self.session.prepare_flood(
-                    contact, self.config.timeout
+                    contact, self.config.request_timeout
                 ):
                     last_reason = "reset_failed"
                     self.logger.warning(
@@ -373,7 +374,7 @@ class Poller:
                 contact_name,
                 "owner info",
                 lambda: self.session.get_owner_info(
-                    contact, self.config.timeout
+                    contact, self.config.request_timeout
                 ),
                 mode,
             )
@@ -400,7 +401,7 @@ class Poller:
                     contact_name,
                     "version via CLI",
                     lambda: self.session.get_remote_version(
-                        contact, self.config.timeout
+                        contact, self.config.request_timeout
                     ),
                     mode,
                 )
@@ -414,7 +415,7 @@ class Poller:
                     contact_name,
                     "name via CLI",
                     lambda: self.session.get_remote_name(
-                        contact, self.config.timeout
+                        contact, self.config.request_timeout
                     ),
                     mode,
                 )
@@ -428,7 +429,7 @@ class Poller:
                     contact_name,
                     "owner info via CLI",
                     lambda: self.session.get_remote_owner_info(
-                        contact, self.config.timeout
+                        contact, self.config.request_timeout
                     ),
                     mode,
                 )
@@ -450,7 +451,7 @@ class Poller:
             contact,
             contact_name,
             "status",
-            lambda: self.session.get_status(contact, self.config.timeout),
+            lambda: self.session.get_status(contact, self.config.request_timeout),
             mode,
         )
         status_info: StatusInfo | None = status_result.value
@@ -461,7 +462,7 @@ class Poller:
             contact_name,
             "neighbours",
             lambda: self.session.get_neighbours_count(
-                contact, self.config.timeout
+                contact, self.config.request_timeout
             ),
             mode,
         )

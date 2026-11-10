@@ -23,7 +23,8 @@ def test_parser_defaults():
     assert config.export_xlsx is None
     assert config.loop is False
     assert config.loop_interval == 60.0
-    assert config.timeout == 25.0
+    assert config.timeout == 15.0
+    assert config.request_timeout == 25.0
     assert config.min_delay == 20.0
     assert config.max_delay == 30.0
     assert config.clock_skew_threshold == 600
@@ -60,6 +61,8 @@ def test_parser_custom_values():
             "1",
             "--timeout",
             "10",
+            "--request-timeout",
+            "30",
             "--min-delay",
             "1",
             "--max-delay",
@@ -86,6 +89,7 @@ def test_parser_custom_values():
     assert config.only == "rep"
     assert config.limit == 1
     assert config.timeout == 10.0
+    assert config.request_timeout == 30.0
     assert config.min_delay == 1.0
     assert config.max_delay == 3.0
     assert config.clock_skew_threshold == 300
@@ -115,6 +119,11 @@ def test_parser_alive_and_dead_modes():
 def test_parser_retry_modes_are_mutually_exclusive(argv):
     with pytest.raises(SystemExit):
         build_config(argv)
+
+
+def test_parser_rejects_non_positive_request_timeout():
+    with pytest.raises(SystemExit):
+        build_config(["--request-timeout", "0"])
 
 
 def test_parser_rejects_non_positive_loop_interval():

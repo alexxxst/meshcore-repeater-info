@@ -31,6 +31,7 @@ def make_config(output, **overrides) -> Config:
         "only": None,
         "limit": None,
         "timeout": 15.0,
+        "request_timeout": 25.0,
         "min_delay": 0.0,
         "max_delay": 0.0,
         "clock_skew_threshold": 600,

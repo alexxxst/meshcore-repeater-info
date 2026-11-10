@@ -22,6 +22,7 @@ class Config:
     only: str | None
     limit: int | None
     timeout: float
+    request_timeout: float
     min_delay: float
     max_delay: float
     clock_skew_threshold: int
