@@ -22,5 +22,5 @@ def is_valid_repeater_name(name: str) -> bool:
         return False  # empty block, e.g. "ABC--Street"
 
     if parts[0] == "LO":
-        return len(parts) >= 3 and bool(_CODE.fullmatch(parts[1]))
-    return len(parts) >= 2 and bool(_CODE.fullmatch(parts[0]))
+        return 3 <= len(parts) <= 5 and bool(_CODE.fullmatch(parts[1]))
+    return 2 <= len(parts) <= 4 and bool(_CODE.fullmatch(parts[0]))

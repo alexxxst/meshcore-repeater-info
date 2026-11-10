@@ -7,10 +7,9 @@ MeshCore Companion через USB serial. Результат — Excel-совм�
 ## Что собирается
 
 - ключ репитера (полный public key);
-- имя репитера — из самого репитера;
+- имя репитера — `contact_name` из списка компаньона;
 - дата последнего адверта (UTC);
 - версия прошивки репитера;
-- имя контакта из списка компаньона;
 - owner info (там часто указан контакт администратора);
 - uptime в человекочитаемом виде;
 - tx/rx airtime в процентах от uptime;
@@ -129,8 +128,8 @@ uv run meshcore-repeater-info --input repeaters.csv --export-xlsx repeaters.xlsx
 Порядок колонок:
 
 ```
-repeater_key;contact_name;last_advert_utc;firmware_version;repeater_name;
-owner_info;uptime;tx_airtime_pct;rx_airtime_pct;login_time_utc;
+repeater_key;contact_name;last_advert_utc;firmware_version;owner_info;
+uptime;tx_airtime_pct;rx_airtime_pct;login_time_utc;
 clock_skew_sec;clock_status;neighbours_count;noise_floor_dbm;
 debug_flags;is_admin;login_password;login_attempts_last;
 login_attempts_total;status;error
@@ -212,17 +211,20 @@ uv run meshcore-repeater-info \
 
 - заголовок — тёмный фон, белый жирный текст;
 - первый столбец ключа — серый фон и жирный текст;
-- `status=ok`/`ok_old` — зелёный, `partial` — жёлтый, ошибки/таймауты —
-  красный фон с белым текстом;
+- `status=ok` — зелёная статусная ячейка; `partial` — жёлтая; ошибки и
+  таймауты — красный фон с белым текстом;
+- вся строка светло-зелёная, если `status=ok`, `error` пустой и нет ни одной
+  красной ячейки; оранжевые `noise_floor_dbm == -120` / `debug_flags != 0`
+  зелёной строке не мешают;
 - ошибочные строки — очень светлый красный фон;
-- старые даты, старая прошивка (<1.16), `clock_status != ok` и невалидные
-  имена репитеров — красный текст;
+- старые даты, старая прошивка (<1.16), `clock_status != ok` и невалидное
+  `contact_name` — красный текст;
 - `noise_floor_dbm == -120` и `debug_flags != 0` — оранжевый текст;
-- автоширина столбцов, форматы дат/процентов/чисел, freeze panes и автофильтр.
+- автоширина столбцов, форматы дат/процентов/чисел, автофильтр;
+- заморожены заголовок и первые два столбца (`C2`).
 
 Правила имён: только ASCII-буквы, цифры, `-`, `_` и `☀`/`☀️`; город —
-минимум 2 блока, первый блок 3 знака; область — `LO` + 3-значный код,
-минимум 3 блока.
+2–4 блока, первый блок 3 знака; область — `LO` + 3-значный код, 3–5 блоков.
 
 ## Ограничения
 

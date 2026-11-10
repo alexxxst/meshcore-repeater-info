@@ -16,6 +16,7 @@ from .storage import CsvStore, FIELDS
 HEADER_BG = "#1F4E78"
 KEY_BG = "#E7E6E6"
 OK_BG = "#C6EFCE"
+LIGHT_GREEN = "#E2EFDA"
 PARTIAL_BG = "#FFEB9C"
 ERROR_BG = "#C00000"
 LIGHT_RED = "#FFE4E4"
@@ -36,7 +37,7 @@ INT_FIELDS = {
 }
 WRAP_FIELDS = {"owner_info", "error"}
 ERROR_STATUSES = {"login_failed", "timeout", "error", "final_fail"}
-STATUS_BG = {"ok": OK_BG, "ok_old": OK_BG, "partial": PARTIAL_BG}
+STATUS_BG = {"ok": OK_BG, "partial": PARTIAL_BG}
 
 
 class _Formats:
@@ -125,7 +126,7 @@ def _percent(value: str) -> float | None:
 
 
 def _cell_font(field: str, value: str, row: dict[str, str], now: int) -> str | None:
-    if field in {"contact_name", "repeater_name"}:
+    if field == "contact_name":
         return RED_FONT if value and not is_valid_repeater_name(value) else None
     if field in DATE_FIELDS:
         return RED_FONT if value and _date_is_far(value, now) else None
@@ -217,7 +218,22 @@ def export_csv_to_xlsx(
             )
         )
         error_row = status in ERROR_STATUSES or not status or not has_data
-        row_bg = LIGHT_RED if error_row else None
+        has_red_cell = any(
+            _cell_font(field, row.get(field, "") or "", row, now) == RED_FONT
+            for field in FIELDS
+        )
+        green_row = (
+            status == "ok"
+            and not (row.get("error") or "")
+            and not error_row
+            and not has_red_cell
+        )
+        if error_row:
+            row_bg = LIGHT_RED
+        elif green_row:
+            row_bg = LIGHT_GREEN
+        else:
+            row_bg = None
 
         for col, field in enumerate(FIELDS):
             value = row.get(field, "") or ""
@@ -266,5 +282,5 @@ def export_csv_to_xlsx(
 
     if rows:
         worksheet.autofilter(0, 0, len(rows), len(FIELDS) - 1)
-    worksheet.freeze_panes(1, 1)
+    worksheet.freeze_panes(1, 2)
     workbook.close()

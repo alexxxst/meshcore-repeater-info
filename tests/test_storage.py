@@ -58,12 +58,11 @@ def test_new_file_is_excel_friendly_and_has_expected_order(tmp_path):
         "contact_name",
         "last_advert_utc",
         "firmware_version",
-        "repeater_name",
         "owner_info",
+        "uptime",
     ]
 
     row = read_rows(path)[0]
-    assert row["repeater_name"] == "Repeater Name"
     assert row["last_advert_utc"] == "2023-11-14 22:13:20"
     assert row["contact_name"] == "Contact Name"
     assert row["owner_info"] == "Admin: @foo | Phone: 123"
@@ -118,7 +117,6 @@ def test_failed_poll_preserves_previous_measurements(tmp_path):
     )
 
     row = read_rows(path)[0]
-    assert row["repeater_name"] == "Repeater"
     assert row["last_advert_utc"] == "2023-11-14 22:13:20"
     assert row["firmware_version"] == "v1.18.0"
     assert row["uptime"] == "1 м"
@@ -303,7 +301,6 @@ def test_load_accepts_bom_and_missing_columns(tmp_path):
     row = store.get("a" * 64)
     assert row["contact_name"] == "Old Name"
     assert row["status"] == "ok"
-    assert row["repeater_name"] == ""
 
 
 def test_header_without_key_is_rejected(tmp_path):

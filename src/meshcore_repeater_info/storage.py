@@ -20,7 +20,6 @@ FIELDS = [
     "contact_name",
     "last_advert_utc",
     "firmware_version",
-    "repeater_name",
     "owner_info",
     "uptime",
     "tx_airtime_pct",
@@ -208,8 +207,6 @@ class CsvStore:
         row["repeater_key"] = result.key.lower()
         row["contact_name"] = str(result.contact_name)
 
-        if result.repeater_name is not None:
-            row["repeater_name"] = str(result.repeater_name)
         if result.advert_timestamp is not None:
             row["last_advert_utc"] = format_utc(result.advert_timestamp)
         if result.firmware_version is not None:

@@ -110,16 +110,14 @@ interruption does not corrupt the report.
 Column order:
 
 ```
-repeater_key;contact_name;last_advert_utc;firmware_version;repeater_name;
-owner_info;uptime;tx_airtime_pct;rx_airtime_pct;login_time_utc;
+repeater_key;contact_name;last_advert_utc;firmware_version;owner_info;
+uptime;tx_airtime_pct;rx_airtime_pct;login_time_utc;
 clock_skew_sec;clock_status;neighbours_count;noise_floor_dbm;
 debug_flags;is_admin;login_password;login_attempts_last;
 login_attempts_total;status;error
 ```
 
 - `contact_name` is the companion contact's `adv_name`.
-- `repeater_name` comes from the repeater itself; never fall back to the
-  advert name.
 - `last_advert_utc` is the contact's `last_advert` timestamp formatted UTC.
 - `clock_skew_sec = repeater login time − our time`; `clock_status=suspect`
   when `abs(skew) > 600`.
@@ -165,15 +163,18 @@ login_attempts_total;status;error
 ## XLSX export
 
 - `--input CSV --export-xlsx XLSX` is an export-only mode; no radio connection.
-- Styling: dark header, gray/bold key column, green `ok`/`ok_old`, yellow
+- Styling: dark header, gray/bold key column, green `ok` status, yellow
   `partial`, red error statuses with white text, very light red error rows.
+- A whole row is light green only when `status == "ok"`, `error` is empty and
+  no cell is red. Orange noise/debug cells do not block the green row.
 - Red text: old dates (>10 days from now), old firmware (<1.16 or `старая`),
-  `clock_status != ok`, invalid `contact_name`/`repeater_name`.
+  `clock_status != ok`, invalid `contact_name`.
 - Orange text: `noise_floor_dbm == -120`, `debug_flags != 0`.
-- Auto column widths, date/percent/number formats, freeze panes, autofilter.
+- Auto column widths, date/percent/number formats, autofilter.
+- Frozen panes: `C2` — header plus the first two columns.
 - Percentages are written as real numeric fractions (`0.1234`) with the
   `0.00%` format, so the CSV comma decimal separator does not leak into XLSX.
-- Name validation: city ≥2 blocks, region `LO` + 3-char code ≥3 blocks; ASCII
+- Name validation: city 2–4 blocks, region `LO` + 3-char code 3–5 blocks; ASCII
   letters/digits/`-`/`_` plus `☀`/`☀️`.
 
 ## Repository hygiene

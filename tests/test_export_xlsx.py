@@ -29,8 +29,8 @@ def make_csv(path):
             clock_skew_seconds=10,
             clock_status="ok",
             neighbours_count=3,
-            noise_floor_dbm=-110,
-            debug_flags=0,
+            noise_floor_dbm=-120,
+            debug_flags=2,
             is_admin=False,
             login_password="(empty)",
             login_method="empty",
@@ -75,6 +75,26 @@ def make_csv(path):
             error="15 login attempts failed",
         )
     )
+    store.apply_result(
+        PollResult(
+            key="d" * 64,
+            contact_name="Bad Name!",
+            firmware_version="v1.18.0",
+            uptime_seconds=100,
+            tx_airtime_seconds=10,
+            rx_airtime_seconds=5,
+            advert_timestamp=NOW,
+            login_timestamp=NOW,
+            clock_skew_seconds=10,
+            clock_status="ok",
+            neighbours_count=3,
+            noise_floor_dbm=-110,
+            debug_flags=0,
+            login_attempts_last=1,
+            login_attempts_total=0,
+            status="ok",
+        )
+    )
 
 
 def color(cell):
@@ -101,7 +121,8 @@ def test_export_xlsx_styles_and_formats(tmp_path):
 
     assert header[0] == "repeater_key"
     assert header[1] == "contact_name"
-    assert sheet.freeze_panes == "B2"
+    assert "repeater_name" not in header
+    assert sheet.freeze_panes == "C2"
     assert sheet.auto_filter.ref is not None
     assert sheet.column_dimensions["A"].width > 20
 
@@ -111,8 +132,12 @@ def test_export_xlsx_styles_and_formats(tmp_path):
     assert color(sheet.cell(2, 1)).endswith("E7E6E6")
     assert sheet.cell(2, 1).font.bold is True
 
-    # ok row: green status.
+    # Clean ok row: whole row light green, status green; orange cells do not
+    # prevent the green row.
+    assert color(sheet.cell(2, col["contact_name"])).endswith("E2EFDA")
     assert color(sheet.cell(2, col["status"])).endswith("C6EFCE")
+    assert font_color(sheet.cell(2, col["noise_floor_dbm"])).endswith("ED7D31")
+    assert font_color(sheet.cell(2, col["debug_flags"])).endswith("ED7D31")
 
     # partial row: yellow status, old version/date/clock red, noise/debug orange.
     assert color(sheet.cell(3, col["status"])).endswith("FFEB9C")
@@ -129,9 +154,10 @@ def test_export_xlsx_styles_and_formats(tmp_path):
     assert color(sheet.cell(4, col["status"])).endswith("C00000")
     assert font_color(sheet.cell(4, col["status"])).endswith("FFFFFF")
 
-    # invalid names are red text.
+    # invalid contact name is red text and prevents the green row.
     assert font_color(sheet.cell(4, col["contact_name"])).endswith("C00000")
-    assert font_color(sheet.cell(4, col["repeater_name"])).endswith("C00000")
+    assert not color(sheet.cell(5, col["contact_name"])).endswith("E2EFDA")
+    assert font_color(sheet.cell(5, col["contact_name"])).endswith("C00000")
 
     # cell formats
     date_cell = sheet.cell(2, col["last_advert_utc"])
