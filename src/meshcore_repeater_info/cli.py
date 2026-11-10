@@ -226,6 +226,7 @@ def _log_poll_result(result: PollResult) -> None:
 
 
 ADVERT_REFRESH_SECONDS = 86_400
+FRESH_FINAL_FAIL_RESET = 25
 
 
 def _advert_is_newer(contact: dict, row: dict[str, str]) -> bool:
@@ -334,15 +335,25 @@ async def run_inventory(
                 format_utc(int(contact["last_advert"])),
             )
 
+        if config.force:
+            reset_total, reset_value = True, 0
+        elif fresh_advert:
+            reset_total = True
+            reset_value = (
+                FRESH_FINAL_FAIL_RESET
+                if existing.get("status") == "final_fail"
+                else 0
+            )
+        elif config.dead or config.broken:
+            reset_total, reset_value = True, 0
+        else:
+            reset_total, reset_value = False, 0
+
         store.ensure_row(
             key,
             contact_name,
-            reset_total=(
-                config.force
-                or config.dead
-                or config.broken
-                or fresh_advert
-            ),
+            reset_total=reset_total,
+            reset_value=reset_value,
         )
         existing = store.get(key) or {}
         try:

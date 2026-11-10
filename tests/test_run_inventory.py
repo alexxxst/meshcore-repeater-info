@@ -46,10 +46,12 @@ def make_config(output, **overrides) -> Config:
 
 
 class FakeSession:
-    def __init__(self, contacts, fail_keys=()):
+    def __init__(self, contacts, fail_keys=(), reject_logins=False):
         self.contacts = contacts
         self.fail_keys = set(fail_keys)
+        self.reject_logins = reject_logins
         self.login_contacts: list[str] = []
+        self.login_attempts: list[str] = []
 
     async def get_repeater_contacts(self):
         return self.contacts
@@ -62,8 +64,11 @@ class FakeSession:
 
     async def login(self, contact, password, timeout):
         key = contact["public_key"]
+        self.login_attempts.append(key)
         if key in self.fail_keys:
             raise RuntimeError("radio exploded")
+        if self.reject_logins:
+            return LoginOutcome(success=False, reason="rejected")
         self.login_contacts.append(key)
         return LoginOutcome(
             success=True, reason="ok", is_admin=False, fw_ver_level=2
@@ -435,6 +440,39 @@ async def test_loop_alive_mode_does_not_promote_broken_rows(tmp_path):
 
     assert summary.polled == 0
     assert summary.skipped == 1
+
+
+@pytest.mark.asyncio
+async def test_loop_fresh_advert_resets_final_fail_to_25(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    store.apply_result(
+        PollResult(
+            key="c" * 64,
+            contact_name="Gamma",
+            status="final_fail",
+            login_attempts_total=35,
+            advert_timestamp=1_000,
+        )
+    )
+    session = FakeSession(
+        [{**contact("c", "Gamma"), "last_advert": 87_401}],
+        reject_logins=True,
+    )
+
+    summary = await run_inventory(
+        make_config(path, loop=True),
+        session,
+        store,
+        poller=make_poller(session, store),
+    )
+
+    # Reset to 25 means exactly 10 more login attempts before final_fail.
+    assert summary.polled == 1
+    assert len(session.login_attempts) == 10
+    assert store.get("c" * 64)["status"] == "final_fail"
+    assert store.get("c" * 64)["login_attempts_total"] == "35"
 
 
 @pytest.mark.asyncio

@@ -168,7 +168,13 @@ class CsvStore:
         self._write()
         return True
 
-    def ensure_row(self, key: str, contact_name: str, reset_total: bool) -> None:
+    def ensure_row(
+        self,
+        key: str,
+        contact_name: str,
+        reset_total: bool,
+        reset_value: int = 0,
+    ) -> None:
         """Create a row before polling and optionally reset the attempt counter."""
         key = key.lower()
         row = self.rows.get(key)
@@ -179,7 +185,7 @@ class CsvStore:
             row["login_attempts_last"] = "0"
         row["contact_name"] = contact_name
         if reset_total:
-            row["login_attempts_total"] = "0"
+            row["login_attempts_total"] = str(reset_value)
             row["login_attempts_last"] = "0"
         row["status"] = "in_progress"
         row["error"] = ""
