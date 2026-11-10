@@ -21,7 +21,6 @@ class PollResult:
     login_timestamp: int | None = None
     clock_skew_seconds: int | None = None
     clock_status: str | None = None
-    neighbours_count: int | None = None
     noise_floor_dbm: int | None = None
     debug_flags: int | None = None
     is_admin: bool | None = None

@@ -15,7 +15,6 @@ MeshCore Companion через USB serial. Результат — Excel-совм�
 - tx/rx airtime в процентах от uptime;
 - время логина репитера в UTC;
 - разница часов и флаг `clock_status`;
-- количество соседей;
 - noise floor;
 - debug flags (`err_events`);
 - статус опроса, число попыток, каким паролем и в какой роли удалось войти.
@@ -101,9 +100,10 @@ uv run meshcore-repeater-info --input repeaters.csv --export-xlsx repeaters.xlsx
 5. Если запрос по path не прошёл — до конца опроса этого репитера остаёмся
    на flood. Буквальный direct/zero-hop мы не навязываем: path может быть
    zero-hop только если его так построил сам компаньон.
-6. После login каждый запрос (`GET_OWNER_INFO`, `STATUS`, `NEIGHBOURS`,
-   admin `ver`/`get name`/`get owner.info`) делается до 5 раз. Эти попытки
-   не увеличивают login-счётчик.
+6. После login каждый запрос (`GET_OWNER_INFO`, `STATUS`, admin
+   `ver`/`get name`/`get owner.info`) делается до 5 раз. Эти попытки
+   не увеличивают login-счётчик. Штатно на репитер приходится 3 радиозапроса:
+   login, `GET_OWNER_INFO` (версия/имя/owner) и `STATUS`.
 7. `LOGIN_FAILED` не включает flood: это нормальный ответ, маршрут работает.
    Flood включается при таймауте.
 8. Если после 5 попыток данных нет — `status=partial`, в `error` перечислено,
@@ -133,7 +133,7 @@ uv run meshcore-repeater-info --input repeaters.csv --export-xlsx repeaters.xlsx
 ```
 repeater_key;contact_name;last_advert_utc;firmware_version;owner_info;
 uptime;tx_airtime_pct;rx_airtime_pct;login_time_utc;
-clock_skew_sec;clock_status;neighbours_count;noise_floor_dbm;
+clock_skew_sec;clock_status;noise_floor_dbm;
 debug_flags;is_admin;login_password;login_attempts_last;
 login_attempts_total;status;error
 ```

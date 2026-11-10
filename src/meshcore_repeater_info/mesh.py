@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any, Protocol
@@ -58,14 +57,11 @@ class MeshSession(Protocol):
 
     async def get_status(self, contact: dict, timeout: float) -> StatusInfo | None: ...
 
-    async def get_neighbours_count(self, contact: dict, timeout: float) -> int | None: ...
-
     async def close(self) -> None: ...
 
 
 class RepeaterRequest(IntEnum):
     STATUS = 0x01
-    NEIGHBOURS = 0x06
     OWNER_INFO = 0x07
 
 
@@ -352,25 +348,6 @@ class MeshCoreSession:
             noise_floor_dbm=int(parsed["noise_floor"]),
             debug_flags=int(parsed["full_evts"]),
         )
-
-    async def get_neighbours_count(
-        self, contact: dict, timeout: float
-    ) -> int | None:
-        # One entry is enough; the response always starts with the total count.
-        request = (
-            b"\x00"
-            + (1).to_bytes(1, "little")
-            + (0).to_bytes(2, "little")
-            + (0).to_bytes(1, "little")
-            + (4).to_bytes(1, "little")
-            + random.randint(1, 0xFFFFFFFF).to_bytes(4, "little")
-        )
-        payload = await self._binary_request(
-            contact, RepeaterRequest.NEIGHBOURS, timeout, data=request
-        )
-        if payload is None or len(payload) < 4:
-            return None
-        return int.from_bytes(payload[0:2], "little", signed=True)
 
     async def close(self) -> None:
         if self._path_subscription is not None:

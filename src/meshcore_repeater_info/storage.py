@@ -27,7 +27,6 @@ FIELDS = [
     "login_time_utc",
     "clock_skew_sec",
     "clock_status",
-    "neighbours_count",
     "noise_floor_dbm",
     "debug_flags",
     "is_admin",
@@ -241,8 +240,6 @@ class CsvStore:
                 row["login_time_utc"] = format_utc(result.login_timestamp)
                 row["clock_skew_sec"] = format_clock_skew(result.clock_skew_seconds)
 
-        if result.neighbours_count is not None:
-            row["neighbours_count"] = str(result.neighbours_count)
         if result.noise_floor_dbm is not None:
             row["noise_floor_dbm"] = str(result.noise_floor_dbm)
         if result.debug_flags is not None:

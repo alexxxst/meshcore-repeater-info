@@ -46,8 +46,6 @@ class FakeSession:
         remote_owner_results: list[str | None] | None = None,
         status: StatusInfo | None = None,
         status_results: list[StatusInfo | None] | None = None,
-        neighbours: int | None = 3,
-        neighbours_results: list[int | None] | None = None,
     ):
         self.login_results = login_results or {}
         self.login_sequence = login_sequence
@@ -62,8 +60,6 @@ class FakeSession:
         self.remote_owner_results = remote_owner_results
         self.status = status
         self.status_results = status_results
-        self.neighbours = neighbours
-        self.neighbours_results = neighbours_results
 
         self.has_route_flag = False
         self.prepare_flood_calls = 0
@@ -77,8 +73,6 @@ class FakeSession:
         self.remote_owner_calls = 0
         self.status_calls = 0
         self.status_timeouts: list[float] = []
-        self.neighbours_calls = 0
-        self.neighbours_timeouts: list[float] = []
 
     async def prepare_flood(self, contact, timeout):
         self.prepare_flood_calls += 1
@@ -129,13 +123,6 @@ class FakeSession:
         if self.status_results:
             return self.status_results.pop(0)
         return self.status
-
-    async def get_neighbours_count(self, contact, timeout):
-        self.neighbours_calls += 1
-        self.neighbours_timeouts.append(timeout)
-        if self.neighbours_results:
-            return self.neighbours_results.pop(0)
-        return self.neighbours
 
 
 class FakeTracker:
@@ -221,7 +208,6 @@ async def test_startup_is_flood_then_switches_to_path_after_route_learned():
     assert session.login_calls == [""]
     assert session.owner_calls == 1
     assert session.status_calls == 1
-    assert session.neighbours_calls == 1
     assert result.status == "ok"
 
 
@@ -236,7 +222,7 @@ async def test_no_route_keeps_flooding_every_request():
 
     result = await make_poller(session, FakeTracker(), FakeSleeper()).poll(CONTACT)
 
-    assert session.prepare_flood_calls == 4  # login, owner, status, neighbours
+    assert session.prepare_flood_calls == 3  # login, owner, status
     assert result.status == "ok"
 
 
@@ -256,8 +242,7 @@ async def test_login_uses_15s_and_post_login_requests_use_25s():
     assert session.login_timeouts == [15.0]
     assert session.owner_timeouts == [25.0]
     assert session.status_timeouts == [25.0]
-    assert session.neighbours_timeouts == [25.0]
-    assert session.prepare_flood_timeouts == [15.0, 25.0, 25.0, 25.0]
+    assert session.prepare_flood_timeouts == [15.0, 25.0, 25.0]
 
 
 @pytest.mark.asyncio
@@ -343,8 +328,8 @@ async def test_path_login_timeout_falls_back_to_flood_for_rest_of_session():
     result = await make_poller(session, FakeTracker(), FakeSleeper()).poll(CONTACT)
 
     # first flood, path timeout, then flood for the remaining attempts and
-    # for owner info, status and neighbours
-    assert session.prepare_flood_calls == 6
+    # for owner info and status
+    assert session.prepare_flood_calls == 5
     assert result.is_admin is True
 
 
@@ -411,9 +396,9 @@ async def test_path_request_failure_switches_to_flood_for_rest_of_session():
 
     result = await make_poller(session, FakeTracker(), FakeSleeper()).poll(CONTACT)
 
-    # login flood -> path; owner path fails, 4 flood retries; status+neighbours flood
+    # login flood -> path; owner path fails, 4 flood retries; status flood
     assert session.owner_calls == 5
-    assert session.prepare_flood_calls == 7
+    assert session.prepare_flood_calls == 6
     assert result.status == "partial"
     assert "owner info (5 attempts, flood)" in result.error
 

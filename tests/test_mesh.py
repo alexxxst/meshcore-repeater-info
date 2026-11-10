@@ -61,23 +61,9 @@ async def test_status_maps_binary_fields():
 
 
 @pytest.mark.asyncio
-async def test_neighbours_count_reads_total_from_response():
-    session = PayloadSession((7).to_bytes(2, "little", signed=True) + b"\x00\x00")
-
-    assert await session.get_neighbours_count(CONTACT, 9.0) == 7
-    request_type, request_data = session.requests[0]
-    assert request_type == 0x06
-    assert request_data[0] == 0  # request version
-    assert request_data[1] == 1  # ask for one entry
-
-
-@pytest.mark.asyncio
-async def test_short_status_or_neighbours_payload_is_none():
+async def test_short_status_payload_is_none():
     status_session = PayloadSession(b"\x00\x01")
     assert await status_session.get_status(CONTACT, 9.0) is None
-
-    neighbours_session = PayloadSession(b"\x01")
-    assert await neighbours_session.get_neighbours_count(CONTACT, 9.0) is None
 
 
 class DummySubscription:

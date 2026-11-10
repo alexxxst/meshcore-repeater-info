@@ -84,9 +84,6 @@ class FakeSession:
     async def get_status(self, contact, timeout):
         return StatusInfo(100, 10, 5, -110, 1)
 
-    async def get_neighbours_count(self, contact, timeout):
-        return 2
-
     async def close(self):
         pass
 

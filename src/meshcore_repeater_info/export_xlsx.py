@@ -29,7 +29,6 @@ DATE_FIELDS = {"last_advert_utc", "login_time_utc"}
 PERCENT_FIELDS = {"tx_airtime_pct", "rx_airtime_pct"}
 INT_FIELDS = {
     "clock_skew_sec",
-    "neighbours_count",
     "noise_floor_dbm",
     "debug_flags",
     "login_attempts_last",
@@ -216,7 +215,6 @@ def export_csv_to_xlsx(
             for field in (
                 "firmware_version",
                 "uptime",
-                "neighbours_count",
                 "noise_floor_dbm",
                 "debug_flags",
             )

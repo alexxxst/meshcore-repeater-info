@@ -36,7 +36,6 @@ def test_new_file_is_excel_friendly_and_has_expected_order(tmp_path):
             login_timestamp=1_700_000_000,
             clock_skew_seconds=42,
             clock_status="ok",
-            neighbours_count=12,
             noise_floor_dbm=-115,
             debug_flags=2,
             is_admin=True,
@@ -93,7 +92,6 @@ def test_failed_poll_preserves_previous_measurements(tmp_path):
             login_timestamp=1_700_000_000,
             clock_skew_seconds=1,
             clock_status="ok",
-            neighbours_count=3,
             noise_floor_dbm=-110,
             debug_flags=1,
             is_admin=False,
@@ -124,7 +122,6 @@ def test_failed_poll_preserves_previous_measurements(tmp_path):
     assert row["rx_airtime_pct"] == "5,00"
     assert row["login_time_utc"] == "2023-11-14 22:13:20"
     assert row["clock_status"] == "ok"
-    assert row["neighbours_count"] == "3"
     assert row["noise_floor_dbm"] == "-110"
     assert row["debug_flags"] == "1"
     assert row["is_admin"] == "no"

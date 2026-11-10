@@ -28,7 +28,6 @@ def make_csv(path):
             login_timestamp=NOW,
             clock_skew_seconds=10,
             clock_status="ok",
-            neighbours_count=3,
             noise_floor_dbm=-120,
             debug_flags=2,
             is_admin=False,
@@ -52,7 +51,6 @@ def make_csv(path):
             login_timestamp=OLD,
             clock_skew_seconds=700,
             clock_status="suspect",
-            neighbours_count=3,
             noise_floor_dbm=-120,
             debug_flags=2,
             is_admin=False,
@@ -61,7 +59,7 @@ def make_csv(path):
             login_attempts_last=1,
             login_attempts_total=0,
             status="partial",
-            error="missing: neighbours",
+            error="missing: status",
         )
     )
     store.apply_result(
@@ -99,7 +97,6 @@ def make_csv(path):
             login_timestamp=NOW,
             clock_skew_seconds=10,
             clock_status="ok",
-            neighbours_count=3,
             noise_floor_dbm=-110,
             debug_flags=0,
             login_attempts_last=1,
@@ -183,7 +180,6 @@ def test_export_xlsx_styles_and_formats(tmp_path):
     percent_cell = sheet.cell(2, col["tx_airtime_pct"])
     assert abs(percent_cell.value - 0.1) < 1e-9
     assert percent_cell.number_format == "0.00%"
-    assert sheet.cell(2, col["neighbours_count"]).number_format == "0"
 
 
 @pytest.mark.parametrize(

@@ -54,12 +54,6 @@ guest-запись во флеш не сохраняется.
 | `noise_floor_dbm` | `noise_floor` |
 | `debug_flags` | `err_events` (в `meshcore_py` — `full_evts`) |
 
-## `NEIGHBOURS`
-
-Бинарный запрос `REQ_TYPE_GET_NEIGHBOURS` (`0x06`). Запрашивается всего одна
-запись (`count=1`), потому что ответ всегда начинается с общего количества
-соседей. В отчёт попадает только `neighbours_count`.
-
 ## Flood / path
 
 Прошивка компаньона выбирает flood, только если у контакта

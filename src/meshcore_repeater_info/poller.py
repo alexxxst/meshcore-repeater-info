@@ -457,26 +457,10 @@ class Poller:
         status_info: StatusInfo | None = status_result.value
         mode = status_result.mode
 
-        neighbours_result = await self._request_with_retries(
-            contact,
-            contact_name,
-            "neighbours",
-            lambda: self.session.get_neighbours_count(
-                contact, self.config.request_timeout
-            ),
-            mode,
-        )
-        neighbours = neighbours_result.value
-        mode = neighbours_result.mode
-
         missing: list[str] = []
         if status_info is None:
             missing.append(
                 f"status ({status_result.attempts} attempts, {status_result.transport})"
-            )
-        if neighbours is None:
-            missing.append(
-                f"neighbours ({neighbours_result.attempts} attempts, {neighbours_result.transport})"
             )
         if version is None:
             missing.append("firmware version")
@@ -511,7 +495,7 @@ class Poller:
                 + ")"
             )
 
-        if version_is_old and status_info is not None and neighbours is not None:
+        if version_is_old and status_info is not None:
             status = "ok_old"
             notes = ["old firmware: version unavailable"]
             if name is None:
@@ -537,7 +521,6 @@ class Poller:
             login_timestamp=login_timestamp,
             clock_skew_seconds=skew,
             clock_status=clock_status(skew, self.config.clock_skew_threshold),
-            neighbours_count=neighbours,
             noise_floor_dbm=status_info.noise_floor_dbm if status_info else None,
             debug_flags=status_info.debug_flags if status_info else None,
             is_admin=outcome.is_admin,

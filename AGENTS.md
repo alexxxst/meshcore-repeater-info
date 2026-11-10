@@ -95,7 +95,6 @@ not force zero-hop. Use **path** for â€œsend using the companion's stored pathâ€
   (`fw_ver_level >= 2`).
 - `STATUS` (`0x01`): uptime, TX/RX airtime, noise floor, debug flags
   (`err_events`, named `full_evts` in `meshcore_py`).
-- `NEIGHBOURS` (`0x06`): only the total count is requested (`count=1`).
 - Admin-only fallback if `GET_OWNER_INFO` fails: remote CLI `ver`,
   `get name`, `get owner.info`.
 - `ANON_REQ_TYPE_OWNER` was removed: repeater answers it only via a direct
@@ -115,7 +114,7 @@ Column order:
 ```
 repeater_key;contact_name;last_advert_utc;firmware_version;owner_info;
 uptime;tx_airtime_pct;rx_airtime_pct;login_time_utc;
-clock_skew_sec;clock_status;neighbours_count;noise_floor_dbm;
+clock_skew_sec;clock_status;noise_floor_dbm;
 debug_flags;is_admin;login_password;login_attempts_last;
 login_attempts_total;status;error
 ```
