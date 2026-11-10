@@ -26,9 +26,9 @@ DEFAULT_PASSWORDS = (
 
 @dataclass(frozen=True)
 class PollConfig:
-    timeout: float = 15.0
-    min_delay: float = 2.0
-    max_delay: float = 4.0
+    timeout: float = 25.0
+    min_delay: float = 20.0
+    max_delay: float = 30.0
     clock_skew_threshold: int = 600
     max_login_attempts: int = 35
     request_attempts: int = 5

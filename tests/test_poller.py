@@ -17,9 +17,9 @@ CONTACT = {"public_key": "a" * 64, "adv_name": "Contact Name", "type": 2}
 
 def make_config(**overrides) -> PollConfig:
     values = {
-        "timeout": 15.0,
-        "min_delay": 2.0,
-        "max_delay": 4.0,
+        "timeout": 25.0,
+        "min_delay": 20.0,
+        "max_delay": 30.0,
         "clock_skew_threshold": 600,
         "max_login_attempts": 35,
         "request_attempts": 5,
@@ -248,15 +248,15 @@ async def test_same_timeout_is_used_for_login_and_all_requests():
         status=successful_status(),
     )
 
-    await make_poller(session, FakeTracker(), FakeSleeper(), timeout=15.0).poll(
+    await make_poller(session, FakeTracker(), FakeSleeper(), timeout=25.0).poll(
         CONTACT
     )
 
-    assert session.login_timeouts == [15.0]
-    assert session.owner_timeouts == [15.0]
-    assert session.status_timeouts == [15.0]
-    assert session.neighbours_timeouts == [15.0]
-    assert session.prepare_flood_timeouts == [15.0, 15.0, 15.0, 15.0]
+    assert session.login_timeouts == [25.0]
+    assert session.owner_timeouts == [25.0]
+    assert session.status_timeouts == [25.0]
+    assert session.neighbours_timeouts == [25.0]
+    assert session.prepare_flood_timeouts == [25.0, 25.0, 25.0, 25.0]
 
 
 @pytest.mark.asyncio
