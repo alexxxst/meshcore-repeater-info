@@ -11,6 +11,7 @@ from .transport import TransportSpec
 @dataclass(slots=True)
 class Config:
     transport: TransportSpec | None
+    ble_pin: str | None
     baudrate: int
     output: Path
     input: Path | None

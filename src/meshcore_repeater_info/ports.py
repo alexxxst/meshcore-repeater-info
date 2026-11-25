@@ -82,7 +82,13 @@ def looks_like_meshcore(name: str | None, service_uuids) -> bool:
 async def discover_ble_devices(timeout: float = 5.0) -> list[BleDeviceInfo]:
     from bleak import BleakScanner
 
-    found = await BleakScanner.discover(timeout=timeout, return_adv=True)
+    try:
+        found = await BleakScanner.discover(timeout=timeout, return_adv=True)
+    except Exception as exc:
+        raise PortError(
+            f"BLE scan failed: {exc}. Check Bluetooth, or use --list-ports "
+            "for serial."
+        ) from exc
     by_address: dict[str, BleDeviceInfo] = {}
     for device, adv in found.values():
         name = adv.local_name or device.name or ""

@@ -184,12 +184,15 @@ def build_config(argv: list[str] | None = None) -> Config:
         except ValueError as exc:
             parser.error(str(exc))
     if args.ble_pin:
-        if transport is None or transport.kind != "ble":
-            parser.error("--ble-pin requires a BLE transport (-p ble://...)")
-        transport = replace(transport, pin=args.ble_pin)
+        if transport is not None and transport.kind != "ble":
+            parser.error(
+                "--ble-pin requires a BLE transport "
+                "(-p ble://... or MESHCORE_PORT=ble://...)"
+            )
 
     return Config(
         transport=transport,
+        ble_pin=args.ble_pin,
         baudrate=args.baudrate,
         output=args.output,
         input=args.input,
@@ -487,19 +490,42 @@ async def _run_loop(
             await session.close()
 
 
-async def _resolve_transport(explicit: TransportSpec | None) -> TransportSpec:
+def _with_pin(spec: TransportSpec, pin: str | None) -> TransportSpec:
+    if not pin:
+        return spec
+    if spec.kind != "ble":
+        raise ValueError(
+            "--ble-pin requires a BLE transport "
+            "(-p ble://... or MESHCORE_PORT=ble://...)"
+        )
+    return replace(spec, pin=pin)
+
+
+async def _resolve_transport(
+    explicit: TransportSpec | None, pin: str | None = None
+) -> TransportSpec:
     """Pick the transport: explicit flag, MESHCORE_PORT, serial, then BLE."""
     if explicit is not None:
-        return explicit
+        spec = explicit
+        if spec.kind == "ble" and spec.target is None:
+            spec = ble_spec_from_devices(await discover_ble_devices())
+        return _with_pin(spec, pin)
 
     env_spec = transport_from_env()
     if env_spec is not None:
-        return env_spec
+        return _with_pin(env_spec, pin)
 
     ports = discover_ports()
     if likely_port_candidates(ports):
-        return TransportSpec("serial", select_port(ports))
-    return ble_spec_from_devices(await discover_ble_devices())
+        return _with_pin(TransportSpec("serial", select_port(ports)), pin)
+
+    devices = await discover_ble_devices()
+    if devices:
+        return _with_pin(ble_spec_from_devices(devices), pin)
+    raise PortError(
+        "No MeshCore Companion found: no matching serial port and no MeshCore "
+        "BLE device. Use --list-ports / --list-ble, or pass -p <transport>."
+    )
 
 
 async def _async_main(config: Config) -> int:
@@ -518,7 +544,7 @@ async def _async_main(config: Config) -> int:
         logger.info("Exported %s to %s", input_path, config.export_xlsx)
         return 0
 
-    spec = await _resolve_transport(config.transport)
+    spec = await _resolve_transport(config.transport, config.ble_pin)
     store = CsvStore(config.output)
     store.load()
 

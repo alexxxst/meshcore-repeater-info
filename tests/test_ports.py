@@ -97,3 +97,16 @@ async def test_discover_ble_devices_filters_and_sorts(monkeypatch):
 
     assert [device.name for device in devices] == ["MeshCore-A", "MeshCore-B"]
     assert [device.rssi for device in devices] == [-50, -60]
+
+
+@pytest.mark.asyncio
+async def test_discover_ble_devices_wraps_scanner_failure(monkeypatch):
+    import bleak
+
+    async def failing_discover(timeout=5.0, return_adv=False):
+        raise RuntimeError("adapter off")
+
+    monkeypatch.setattr(bleak.BleakScanner, "discover", staticmethod(failing_discover))
+
+    with pytest.raises(PortError, match="BLE scan failed"):
+        await discover_ble_devices()

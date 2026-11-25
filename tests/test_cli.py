@@ -167,7 +167,8 @@ def test_select_contacts_rejects_ambiguous_or_unknown():
 
 def test_parser_ble_transport_with_pin():
     config = build_config(["-p", "ble://MeshCore-A1B2", "--ble-pin", "123456"])
-    assert config.transport == TransportSpec("ble", "MeshCore-A1B2", pin="123456")
+    assert config.transport == TransportSpec("ble", "MeshCore-A1B2")
+    assert config.ble_pin == "123456"
 
 
 def test_parser_tcp_transport():
@@ -175,11 +176,15 @@ def test_parser_tcp_transport():
     assert config.transport == TransportSpec("tcp", "10.0.0.2", 4000)
 
 
-def test_parser_rejects_pin_without_ble():
-    with pytest.raises(SystemExit):
-        build_config(["--ble-pin", "123456"])
+def test_parser_rejects_pin_with_explicit_non_ble():
     with pytest.raises(SystemExit):
         build_config(["-p", "tcp://10.0.0.2", "--ble-pin", "123456"])
+
+
+def test_parser_defers_pin_when_transport_comes_from_env():
+    config = build_config(["--ble-pin", "123456"])
+    assert config.transport is None
+    assert config.ble_pin == "123456"
 
 
 def test_parser_rejects_unknown_transport_scheme():
@@ -250,6 +255,54 @@ async def test_resolve_transport_rejects_multiple_ble_devices(monkeypatch):
     monkeypatch.setattr(cli, "discover_ble_devices", fake_ble)
     with pytest.raises(PortError, match="Multiple MeshCore BLE devices"):
         await cli._resolve_transport(None)
+
+
+@pytest.mark.asyncio
+async def test_resolve_transport_reports_both_serial_and_ble_absence(monkeypatch):
+    monkeypatch.delenv("MESHCORE_PORT", raising=False)
+    monkeypatch.setattr(
+        cli, "discover_ports", lambda: [PortInfo("/dev/cu.usbserial-1420", "USB serial")]
+    )
+
+    async def no_ble():
+        return []
+
+    monkeypatch.setattr(cli, "discover_ble_devices", no_ble)
+    with pytest.raises(PortError, match="No MeshCore Companion found"):
+        await cli._resolve_transport(None)
+
+
+@pytest.mark.asyncio
+async def test_resolve_transport_applies_pin_to_env_ble(monkeypatch):
+    monkeypatch.setenv("MESHCORE_PORT", "ble://MeshCore-A1B2")
+    spec = await cli._resolve_transport(None, "123456")
+    assert spec == TransportSpec("ble", "MeshCore-A1B2", pin="123456")
+
+
+@pytest.mark.asyncio
+async def test_resolve_transport_rejects_pin_for_non_ble(monkeypatch):
+    monkeypatch.setenv("MESHCORE_PORT", "tcp://10.0.0.2")
+    with pytest.raises(ValueError, match="--ble-pin"):
+        await cli._resolve_transport(None, "123456")
+
+
+@pytest.mark.asyncio
+async def test_resolve_transport_resolves_bare_ble_to_single_device(monkeypatch):
+    async def fake_ble():
+        return [BleDeviceInfo("AA", "MeshCore-A", -40)]
+
+    monkeypatch.setattr(cli, "discover_ble_devices", fake_ble)
+    assert await cli._resolve_transport(TransportSpec("ble")) == TransportSpec("ble", "AA")
+
+
+@pytest.mark.asyncio
+async def test_resolve_transport_rejects_ambiguous_bare_ble(monkeypatch):
+    async def fake_ble():
+        return [BleDeviceInfo("AA", "MeshCore-A", -40), BleDeviceInfo("BB", "MeshCore-B", -50)]
+
+    monkeypatch.setattr(cli, "discover_ble_devices", fake_ble)
+    with pytest.raises(PortError, match="Multiple MeshCore BLE devices"):
+        await cli._resolve_transport(TransportSpec("ble"))
 
 
 @pytest.mark.asyncio

@@ -42,6 +42,7 @@ def make_config(output, **overrides) -> Config:
         "debug": False,
         "list_ports": False,
         "list_ble": False,
+        "ble_pin": None,
     }
     values.update(overrides)
     return Config(**values)
@@ -96,6 +97,17 @@ class FakeSession:
 
     def is_connected(self):
         return True
+
+
+class SequencedSession(FakeSession):
+    """FakeSession whose connectivity comes from a scripted sequence."""
+
+    def __init__(self, contacts, checks):
+        super().__init__(contacts)
+        self._checks = iter(checks)
+
+    def is_connected(self):
+        return next(self._checks)
 
 
 class FakeSleeper:
@@ -620,3 +632,34 @@ async def test_transport_loss_aborts_pass_and_keeps_saved_rows(tmp_path):
     reloaded.load()
     assert reloaded.get("a" * 64)["status"] == "ok"
     assert reloaded.get("b" * 64) is None
+
+
+@pytest.mark.asyncio
+async def test_loop_reconnects_after_transport_loss(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    session = SequencedSession(
+        [contact("a", "Alpha"), contact("b", "Beta")],
+        checks=[True, False, True, True],
+    )
+    connects = 0
+
+    async def connect():
+        nonlocal connects
+        connects += 1
+        return session
+
+    await _run_loop(
+        make_config(path, loop=True, loop_interval=60),
+        store,
+        connect,
+        sleep=FakeSleeper(),
+        max_passes=2,
+    )
+
+    assert connects == 2
+    reloaded = CsvStore(path)
+    reloaded.load()
+    assert reloaded.get("a" * 64)["status"] == "ok"
+    assert reloaded.get("b" * 64)["status"] == "ok"
