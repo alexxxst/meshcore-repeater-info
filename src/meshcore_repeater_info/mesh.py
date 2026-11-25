@@ -57,6 +57,8 @@ class MeshSession(Protocol):
 
     async def get_status(self, contact: dict, timeout: float) -> StatusInfo | None: ...
 
+    def is_connected(self) -> bool: ...
+
     async def close(self) -> None: ...
 
 
@@ -66,7 +68,7 @@ class RepeaterRequest(IntEnum):
 
 
 class MeshCoreSession:
-    """Serial Companion implementation backed by the meshcore Python library."""
+    """Companion implementation backed by the meshcore Python library."""
 
     def __init__(self, mc):
         self.mc = mc
@@ -83,7 +85,7 @@ class MeshCoreSession:
                 logger.debug("Could not subscribe to PATH_UPDATE", exc_info=True)
 
     @classmethod
-    async def connect(
+    async def connect_serial(
         cls,
         port: str,
         baudrate: int = 115200,
@@ -95,6 +97,39 @@ class MeshCoreSession:
         if mc is None:
             raise RuntimeError(f"Companion did not respond on {port}")
         return cls(mc)
+
+    @classmethod
+    async def connect_ble(
+        cls,
+        address: str | None = None,
+        pin: str | None = None,
+        debug: bool = False,
+    ) -> "MeshCoreSession":
+        from meshcore import MeshCore
+
+        mc = await MeshCore.create_ble(address=address, pin=pin, debug=debug)
+        if mc is None:
+            raise RuntimeError(
+                f"Companion did not respond over BLE ({address or 'scan'})"
+            )
+        return cls(mc)
+
+    @classmethod
+    async def connect_tcp(
+        cls,
+        host: str,
+        port: int,
+        debug: bool = False,
+    ) -> "MeshCoreSession":
+        from meshcore import MeshCore
+
+        mc = await MeshCore.create_tcp(host, port, debug=debug)
+        if mc is None:
+            raise RuntimeError(f"Companion did not respond at tcp://{host}:{port}")
+        return cls(mc)
+
+    def is_connected(self) -> bool:
+        return self.mc is not None and bool(self.mc.is_connected)
 
     def _on_path_update(self, event) -> None:
         payload = event.payload or {}

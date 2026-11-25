@@ -187,3 +187,71 @@ async def test_path_update_marks_route_and_prepare_flood_clears_it():
     assert not session.has_route(CONTACT)
     assert mc.commands.reset_calls == 1
     assert CONTACT["out_path_len"] == -1
+
+
+@pytest.mark.asyncio
+async def test_connect_ble_passes_address_and_pin(monkeypatch):
+    import meshcore
+
+    calls = {}
+
+    class FakeMc:
+        is_connected = True
+
+        async def disconnect(self):
+            pass
+
+    async def fake_create_ble(address=None, client=None, device=None, pin=None, debug=False):
+        calls.update(address=address, pin=pin, debug=debug)
+        return FakeMc()
+
+    monkeypatch.setattr(
+        meshcore.MeshCore, "create_ble", staticmethod(fake_create_ble)
+    )
+    session = await MeshCoreSession.connect_ble("MeshCore-A1B2", "123456", True)
+
+    assert calls == {"address": "MeshCore-A1B2", "pin": "123456", "debug": True}
+    assert session.is_connected() is True
+
+
+@pytest.mark.asyncio
+async def test_connect_ble_failure_raises(monkeypatch):
+    import meshcore
+
+    async def fake_create_ble(address=None, client=None, device=None, pin=None, debug=False):
+        return None
+
+    monkeypatch.setattr(
+        meshcore.MeshCore, "create_ble", staticmethod(fake_create_ble)
+    )
+    with pytest.raises(RuntimeError, match="BLE"):
+        await MeshCoreSession.connect_ble(None)
+
+
+@pytest.mark.asyncio
+async def test_connect_tcp_passes_host_and_port(monkeypatch):
+    import meshcore
+
+    calls = {}
+
+    class FakeMc:
+        is_connected = True
+
+        async def disconnect(self):
+            pass
+
+    async def fake_create_tcp(host, port, debug=False):
+        calls.update(host=host, port=port, debug=debug)
+        return FakeMc()
+
+    monkeypatch.setattr(
+        meshcore.MeshCore, "create_tcp", staticmethod(fake_create_tcp)
+    )
+    session = await MeshCoreSession.connect_tcp("10.0.0.2", 4000, True)
+
+    assert calls == {"host": "10.0.0.2", "port": 4000, "debug": True}
+    assert session.is_connected() is True
+
+
+def test_is_connected_is_false_without_transport():
+    assert MeshCoreSession(mc=None).is_connected() is False
