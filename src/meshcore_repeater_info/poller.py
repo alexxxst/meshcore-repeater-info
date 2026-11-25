@@ -28,8 +28,8 @@ DEFAULT_PASSWORDS = (
 class PollConfig:
     timeout: float = 15.0
     request_timeout: float = 25.0
-    min_delay: float = 20.0
-    max_delay: float = 30.0
+    min_delay: float = 2.0
+    max_delay: float = 5.0
     clock_skew_threshold: int = 600
     max_login_attempts: int = 35
     request_attempts: int = 5

@@ -102,7 +102,7 @@ waits for CONTACTS itself: 20 s without any progress, 180 s hard cap,
 - Every post-login request is attempted up to **5 times**
   (`--request-attempts`, minimum 5). These retries do **not** increment the
   login counter.
-- Random pause 20–30 s before every login attempt and every request attempt.
+- Random pause 2–5 s before every login attempt and every request attempt.
 - Login counter: cumulative **failed** login attempts since the last success
   or `--force`. When it reaches 35, `status=final_fail`; no further polling
   until `--force`/`--dead`.
@@ -238,4 +238,4 @@ login_attempts_total;status;error
   inherit `SIGINT` ignored, so `kill -INT` will not stop it; use a foreground
   run/PTY or `SIGTERM` for test harnesses.
 - `--force` on a real repeater can take a long time because of 15/25 s
-  timeouts, 20–30 s pauses and 5 request attempts.
+  timeouts and 5 request attempts.

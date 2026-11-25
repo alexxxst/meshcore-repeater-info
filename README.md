@@ -111,7 +111,7 @@ uv run meshcore-repeater-info --input repeaters.csv --export-xlsx repeaters.xlsx
 | `--export-xlsx` | экспортировать CSV в оформленный XLSX и выйти |
 | `--timeout` | таймаут login-пакета, по умолчанию 15 с |
 | `--request-timeout` | таймаут запросов после login, по умолчанию 25 с |
-| `--min-delay`, `--max-delay` | случайная пауза между пакетами, по умолчанию 20–30 с |
+| `--min-delay`, `--max-delay` | случайная пауза между пакетами, по умолчанию 2–5 с |
 | `--max-login-attempts` | лимит накопленных неудачных login-попыток, по умолчанию 35 |
 | `--request-attempts` | попыток на запрос после login, минимум 5 |
 | `--clock-skew-threshold` | порог `suspect` для часов, по умолчанию 600 с |

@@ -129,8 +129,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=25.0,
         help="timeout for requests after login (default: 25)",
     )
-    parser.add_argument("--min-delay", type=float, default=20.0)
-    parser.add_argument("--max-delay", type=float, default=30.0)
+    parser.add_argument("--min-delay", type=float, default=2.0)
+    parser.add_argument("--max-delay", type=float, default=5.0)
     parser.add_argument("--clock-skew-threshold", type=int, default=600)
     parser.add_argument("--max-login-attempts", type=int, default=35)
     parser.add_argument(

@@ -29,8 +29,8 @@ def test_parser_defaults():
     assert config.loop_interval == 60.0
     assert config.timeout == 15.0
     assert config.request_timeout == 25.0
-    assert config.min_delay == 20.0
-    assert config.max_delay == 30.0
+    assert config.min_delay == 2.0
+    assert config.max_delay == 5.0
     assert config.clock_skew_threshold == 600
     assert config.max_login_attempts == 35
     assert config.request_attempts == 5
