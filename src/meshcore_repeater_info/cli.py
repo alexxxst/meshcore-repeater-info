@@ -26,6 +26,7 @@ from .ports import (
 )
 from .storage import CsvFormatError, CsvStore, should_process
 from .transport import (
+    TransportError,
     TransportSpec,
     ble_spec_from_devices,
     connect_session,
@@ -316,6 +317,8 @@ async def run_inventory(
 
     summary = RunSummary()
     for contact in selected:
+        if not session.is_connected():
+            raise TransportError("Companion connection lost; reconnect and retry")
         key = contact["public_key"].lower()
         contact_name = contact.get("adv_name", "")
         if is_removed_repeater_name(contact_name):
@@ -556,7 +559,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         logger.warning("Interrupted; last completed repeater is safely in the CSV")
         return 130
-    except (PortError, CsvFormatError, ValueError) as exc:
+    except (PortError, CsvFormatError, ValueError, TransportError) as exc:
         logger.error("%s", exc)
         return 1
     except Exception:

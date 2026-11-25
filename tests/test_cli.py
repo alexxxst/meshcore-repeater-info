@@ -5,7 +5,7 @@ import pytest
 import meshcore_repeater_info.cli as cli
 from meshcore_repeater_info.cli import build_config, select_contacts
 from meshcore_repeater_info.ports import BleDeviceInfo, PortError, PortInfo
-from meshcore_repeater_info.transport import TransportSpec
+from meshcore_repeater_info.transport import TransportError, TransportSpec
 
 
 def contact(key_char: str, name: str) -> dict:
@@ -262,3 +262,13 @@ async def test_list_ble_prints_devices_without_connecting(monkeypatch, capsys):
 
     assert code == 0
     assert "MeshCore-A1B2" in capsys.readouterr().out
+
+
+def test_main_reports_transport_error(monkeypatch, caplog):
+    async def boom(config):
+        raise TransportError("link lost")
+
+    monkeypatch.setattr(cli, "_async_main", boom)
+    assert cli.main([]) == 1
+    assert "link lost" in caplog.text
+    assert "Fatal error" not in caplog.text

@@ -9,6 +9,7 @@ from meshcore_repeater_info.mesh import LoginOutcome, OwnerInfo, StatusInfo
 from meshcore_repeater_info.model import PollResult
 from meshcore_repeater_info.poller import DEFAULT_PASSWORDS, PollConfig, Poller
 from meshcore_repeater_info.storage import CsvStore
+from meshcore_repeater_info.transport import TransportError
 
 
 def contact(key_char: str, name: str) -> dict:
@@ -595,3 +596,27 @@ async def test_one_repeater_exception_does_not_stop_the_run(tmp_path):
     assert store.get("a" * 64)["status"] == "error"
     assert "radio exploded" in store.get("a" * 64)["error"]
     assert store.get("b" * 64)["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_transport_loss_aborts_pass_and_keeps_saved_rows(tmp_path):
+    path = tmp_path / "report.csv"
+    store = CsvStore(path)
+    store.load()
+    session = FakeSession([contact("a", "Alpha"), contact("b", "Beta")])
+    checks = iter([True, False])
+    session.is_connected = lambda: next(checks)
+
+    with pytest.raises(TransportError):
+        await run_inventory(
+            make_config(path),
+            session,
+            store,
+            poller=make_poller(session, store),
+        )
+
+    assert session.login_contacts == ["a" * 64]
+    reloaded = CsvStore(path)
+    reloaded.load()
+    assert reloaded.get("a" * 64)["status"] == "ok"
+    assert reloaded.get("b" * 64) is None
