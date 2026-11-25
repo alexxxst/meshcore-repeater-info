@@ -325,3 +325,15 @@ def test_main_reports_transport_error(monkeypatch, caplog):
     assert cli.main([]) == 1
     assert "link lost" in caplog.text
     assert "Fatal error" not in caplog.text
+
+
+def test_main_reports_contacts_fetch_error(monkeypatch, caplog):
+    from meshcore_repeater_info.mesh import ContactsFetchError
+
+    async def boom(config):
+        raise ContactsFetchError("contact list timeout")
+
+    monkeypatch.setattr(cli, "_async_main", boom)
+    assert cli.main([]) == 1
+    assert "contact list timeout" in caplog.text
+    assert "Fatal error" not in caplog.text

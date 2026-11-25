@@ -75,8 +75,13 @@ without a scheme is always a serial path.
 Before every repeater `run_inventory` checks `session.is_connected()`; a lost
 BLE/TCP link raises `TransportError`, which aborts the pass. `--loop`
 reconnects on the next pass; a one-shot run exits 1 with the report already
-saved. BLE scans happen on connect, so the first connect can take a few
-seconds.
+saved.
+
+A full contact sync over BLE takes ~15 s for ~200 contacts. `meshcore`'s
+`get_contacts()` gives the final CONTACTS event a 5 s deadline and returns an
+empty cache, so `MeshCoreSession._fetch_contacts()` sends the raw request and
+waits for CONTACTS itself: 20 s without any progress, 180 s hard cap,
+`ContactsFetchError` on timeout or a Companion ERROR.
 
 ## Current behavior
 

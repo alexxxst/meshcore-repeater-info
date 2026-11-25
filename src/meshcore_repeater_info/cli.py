@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .config import Config
 from .formatting import format_utc, parse_utc
+from .mesh import ContactsFetchError
 from .model import PollResult
 from .names import is_removed_repeater_name
 from .poller import PollConfig, Poller
@@ -585,7 +586,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         logger.warning("Interrupted; last completed repeater is safely in the CSV")
         return 130
-    except (PortError, CsvFormatError, ValueError, TransportError) as exc:
+    except (PortError, CsvFormatError, ValueError, TransportError, ContactsFetchError) as exc:
         logger.error("%s", exc)
         return 1
     except Exception:

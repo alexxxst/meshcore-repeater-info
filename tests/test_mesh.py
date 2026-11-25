@@ -79,6 +79,33 @@ class FakeCommands:
         self.reset_calls = 0
         self.sent_data = None
         self.login_event = None
+        self.contacts_called = 0
+        self.contacts_lastmod = None
+        self.contacts_payload = None
+        self.contacts_silent = False
+        self.contacts_error = None
+
+    async def get_contacts_async(self, lastmod=0):
+        from meshcore.events import Event, EventType
+
+        self.contacts_called += 1
+        self.contacts_lastmod = lastmod
+        if self.contacts_silent:
+            return
+        if self.contacts_error is not None:
+            for handler in self.mc.handlers.get(EventType.ERROR, []):
+                handler(Event(EventType.ERROR, self.contacts_error))
+            return
+        payload = {
+            contact["public_key"]: contact
+            for contact in (self.contacts_payload or [])
+        }
+        self.mc.contacts = payload
+        for contact in payload.values():
+            for handler in self.mc.handlers.get(EventType.NEXT_CONTACT, []):
+                handler(Event(EventType.NEXT_CONTACT, contact))
+        for handler in self.mc.handlers.get(EventType.CONTACTS, []):
+            handler(Event(EventType.CONTACTS, payload, {"lastmod": 1}))
 
     async def send(self, data, expected_events=None, timeout=None):
         from meshcore.events import Event, EventType
@@ -114,6 +141,7 @@ class FakeMC:
     def __init__(self):
         self.handlers: dict = {}
         self.filters: dict = {}
+        self.contacts: dict = {}
         self.commands = FakeCommands(self)
 
     def subscribe(self, event_type, handler, attribute_filters=None):
@@ -255,3 +283,59 @@ async def test_connect_tcp_passes_host_and_port(monkeypatch):
 
 def test_is_connected_is_false_without_transport():
     assert MeshCoreSession(mc=None).is_connected() is False
+
+
+@pytest.mark.asyncio
+async def test_get_repeater_contacts_fetches_full_list_when_cache_empty():
+    mc = FakeMC()
+    mc.commands.contacts_payload = [
+        {"public_key": "a" * 64, "adv_name": "R1", "type": 2},
+        {"public_key": "b" * 64, "adv_name": "R2", "type": 2},
+        {"public_key": "c" * 64, "adv_name": "Chat", "type": 1},
+    ]
+    session = MeshCoreSession(mc)
+
+    contacts = await session.get_repeater_contacts()
+
+    assert [contact["adv_name"] for contact in contacts] == ["R1", "R2"]
+    assert mc.commands.contacts_called == 1
+    assert mc.commands.contacts_lastmod == 0
+
+
+@pytest.mark.asyncio
+async def test_get_repeater_contacts_uses_cache_without_refetch():
+    mc = FakeMC()
+    mc.contacts = {
+        "a" * 64: {"public_key": "a" * 64, "adv_name": "R1", "type": 2}
+    }
+    session = MeshCoreSession(mc)
+
+    contacts = await session.get_repeater_contacts()
+
+    assert [contact["adv_name"] for contact in contacts] == ["R1"]
+    assert mc.commands.contacts_called == 0
+
+
+@pytest.mark.asyncio
+async def test_get_repeater_contacts_stalls_with_clear_error(monkeypatch):
+    import meshcore_repeater_info.mesh as mesh_module
+
+    monkeypatch.setattr(mesh_module, "CONTACTS_STALL_TIMEOUT", 0.01)
+    mc = FakeMC()
+    mc.commands.contacts_silent = True
+    session = MeshCoreSession(mc)
+
+    with pytest.raises(mesh_module.ContactsFetchError, match="contact list"):
+        await session.get_repeater_contacts()
+
+
+@pytest.mark.asyncio
+async def test_get_repeater_contacts_propagates_companion_error():
+    from meshcore_repeater_info.mesh import ContactsFetchError
+
+    mc = FakeMC()
+    mc.commands.contacts_error = {"reason": "busy"}
+    session = MeshCoreSession(mc)
+
+    with pytest.raises(ContactsFetchError, match="busy"):
+        await session.get_repeater_contacts()

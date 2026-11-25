@@ -10,6 +10,13 @@ from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
+CONTACTS_STALL_TIMEOUT = 20.0
+CONTACTS_HARD_TIMEOUT = 180.0
+
+
+class ContactsFetchError(RuntimeError):
+    """Raised when the Companion contact list cannot be fetched."""
+
 
 @dataclass(slots=True)
 class LoginOutcome:
@@ -165,13 +172,74 @@ class MeshCoreSession:
         return True
 
     async def get_repeater_contacts(self) -> list[dict[str, Any]]:
-        await self.mc.ensure_contacts()
         contacts = getattr(self.mc, "contacts", {}) or {}
+        if not contacts:
+            await self._fetch_contacts()
+            contacts = getattr(self.mc, "contacts", {}) or {}
         return [
             contact
             for contact in contacts.values()
             if int(contact.get("type", 0)) == 2  # ADV_TYPE_REPEATER
         ]
+
+    async def _fetch_contacts(self) -> None:
+        """Fetch the full contact list, waiting for the CONTACTS event.
+
+        meshcore's ``get_contacts()`` gives the final CONTACTS event a 5 s
+        deadline; over BLE a full list of ~200 contacts takes ~15 s, so that
+        helper returns an error with an empty cache. Wait on the events
+        ourselves with a stall timeout and a hard cap instead.
+        """
+        from meshcore.events import EventType
+
+        queue: asyncio.Queue = asyncio.Queue()
+        subscriptions = [
+            self.mc.subscribe(EventType.CONTACTS, queue.put_nowait),
+            self.mc.subscribe(EventType.NEXT_CONTACT, queue.put_nowait),
+            self.mc.subscribe(EventType.ERROR, queue.put_nowait),
+        ]
+        loop = asyncio.get_running_loop()
+        started = loop.time()
+        hard_deadline = started + CONTACTS_HARD_TIMEOUT
+        received = 0
+        try:
+            logger.info("Fetching Companion contacts ...")
+            await self.mc.commands.get_contacts_async(lastmod=0)
+            while True:
+                remaining = hard_deadline - loop.time()
+                if remaining <= 0:
+                    raise ContactsFetchError(
+                        "Timed out fetching the companion contact list after "
+                        f"{CONTACTS_HARD_TIMEOUT:.0f} s"
+                    )
+                try:
+                    event = await asyncio.wait_for(
+                        queue.get(), min(CONTACTS_STALL_TIMEOUT, remaining)
+                    )
+                except asyncio.TimeoutError:
+                    raise ContactsFetchError(
+                        "Timed out fetching the companion contact list; "
+                        "check the BLE/Wi-Fi link"
+                    ) from None
+                if event.type == EventType.CONTACTS:
+                    logger.info(
+                        "Fetched %s contacts in %.1f s",
+                        len(getattr(self.mc, "contacts", {}) or {}),
+                        loop.time() - started,
+                    )
+                    return
+                if event.type == EventType.ERROR:
+                    payload = event.payload or {}
+                    raise ContactsFetchError(
+                        "Companion rejected the contact list request: "
+                        f"{payload.get('reason') or payload}"
+                    )
+                received += 1
+                if received % 50 == 0:
+                    logger.debug("Fetching contacts: %s received", received)
+        finally:
+            for subscription in subscriptions:
+                subscription.unsubscribe()
 
     async def login(
         self, contact: dict, password: str, timeout: float
