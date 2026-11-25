@@ -6,6 +6,9 @@ import os
 from dataclasses import dataclass
 from typing import Literal, Mapping
 
+from .mesh import MeshCoreSession
+from .ports import BleDeviceInfo, PortError
+
 DEFAULT_TCP_PORT = 4000
 
 
@@ -80,3 +83,36 @@ def transport_from_env(
     if not value:
         return None
     return parse_transport(value)
+
+
+def ble_spec_from_devices(devices: list[BleDeviceInfo]) -> TransportSpec:
+    """Pick the only discovered MeshCore BLE device, or explain why not."""
+    if not devices:
+        raise PortError(
+            "No MeshCore BLE device found. Power the companion and make sure "
+            "BLE is enabled."
+        )
+    if len(devices) > 1:
+        listed = ", ".join(
+            f"{device.name or '-'} ({device.address})" for device in devices
+        )
+        raise PortError(
+            f"Multiple MeshCore BLE devices: {listed}. "
+            "Pass -p ble://<name-or-address> to choose one."
+        )
+    return TransportSpec("ble", devices[0].address)
+
+
+async def connect_session(
+    spec: TransportSpec,
+    baudrate: int = 115_200,
+    debug: bool = False,
+) -> MeshCoreSession:
+    """Open the session described by ``spec``."""
+    if spec.kind == "serial":
+        return await MeshCoreSession.connect_serial(spec.target, baudrate, debug)
+    if spec.kind == "ble":
+        return await MeshCoreSession.connect_ble(spec.target, spec.pin, debug)
+    if spec.kind == "tcp":
+        return await MeshCoreSession.connect_tcp(spec.target, spec.port, debug)
+    raise ValueError(f"unknown transport kind: {spec.kind}")
