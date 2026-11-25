@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .transport import TransportSpec
+
 
 @dataclass(slots=True)
 class Config:
-    port: str | None
+    transport: TransportSpec | None
     baudrate: int
     output: Path
     input: Path | None
@@ -31,3 +33,4 @@ class Config:
     passwords: tuple[str, ...]
     debug: bool
     list_ports: bool
+    list_ble: bool

@@ -17,7 +17,7 @@ def contact(key_char: str, name: str) -> dict:
 
 def make_config(output, **overrides) -> Config:
     values = {
-        "port": None,
+        "transport": None,
         "baudrate": 115_200,
         "output": output,
         "input": None,
@@ -40,6 +40,7 @@ def make_config(output, **overrides) -> Config:
         "passwords": DEFAULT_PASSWORDS,
         "debug": False,
         "list_ports": False,
+        "list_ble": False,
     }
     values.update(overrides)
     return Config(**values)
@@ -91,6 +92,9 @@ class FakeSession:
 
     async def close(self):
         pass
+
+    def is_connected(self):
+        return True
 
 
 class FakeSleeper:

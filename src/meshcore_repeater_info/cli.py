@@ -7,17 +7,31 @@ import asyncio
 import logging
 import time
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .config import Config
 from .formatting import format_utc, parse_utc
-from .mesh import MeshCoreSession
 from .model import PollResult
 from .names import is_removed_repeater_name
 from .poller import PollConfig, Poller
-from .ports import PortError, discover_ports, format_ports, select_port
+from .ports import (
+    PortError,
+    discover_ble_devices,
+    discover_ports,
+    format_ble_devices,
+    format_ports,
+    likely_port_candidates,
+    select_port,
+)
 from .storage import CsvFormatError, CsvStore, should_process
+from .transport import (
+    TransportSpec,
+    ble_spec_from_devices,
+    connect_session,
+    parse_transport,
+    transport_from_env,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +50,19 @@ def build_parser() -> argparse.ArgumentParser:
             "write an Excel-friendly CSV report."
         ),
     )
-    parser.add_argument("-p", "--port", help="Companion serial port")
+    parser.add_argument(
+        "-p",
+        "--port",
+        help=(
+            "Companion transport: serial port, ble, ble://NAME, "
+            "or tcp://HOST[:PORT]"
+        ),
+    )
     parser.add_argument("-b", "--baudrate", type=int, default=115_200)
+    parser.add_argument(
+        "--ble-pin",
+        help="PIN for BLE pairing (only with -p ble://...)",
+    )
     parser.add_argument(
         "-o",
         "--output",
@@ -120,6 +145,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--list-ports", action="store_true")
+    parser.add_argument(
+        "--list-ble",
+        action="store_true",
+        help="scan and list nearby MeshCore BLE devices",
+    )
     return parser
 
 
@@ -146,8 +176,19 @@ def build_config(argv: list[str] | None = None) -> Config:
     if args.clock_skew_threshold < 0:
         parser.error("--clock-skew-threshold must be >= 0")
 
+    transport = None
+    if args.port:
+        try:
+            transport = parse_transport(args.port)
+        except ValueError as exc:
+            parser.error(str(exc))
+    if args.ble_pin:
+        if transport is None or transport.kind != "ble":
+            parser.error("--ble-pin requires a BLE transport (-p ble://...)")
+        transport = replace(transport, pin=args.ble_pin)
+
     return Config(
-        port=args.port,
+        transport=transport,
         baudrate=args.baudrate,
         output=args.output,
         input=args.input,
@@ -170,6 +211,7 @@ def build_config(argv: list[str] | None = None) -> Config:
         passwords=args.passwords,
         debug=args.debug,
         list_ports=args.list_ports,
+        list_ble=args.list_ble,
     )
 
 
@@ -442,9 +484,27 @@ async def _run_loop(
             await session.close()
 
 
+async def _resolve_transport(explicit: TransportSpec | None) -> TransportSpec:
+    """Pick the transport: explicit flag, MESHCORE_PORT, serial, then BLE."""
+    if explicit is not None:
+        return explicit
+
+    env_spec = transport_from_env()
+    if env_spec is not None:
+        return env_spec
+
+    ports = discover_ports()
+    if likely_port_candidates(ports):
+        return TransportSpec("serial", select_port(ports))
+    return ble_spec_from_devices(await discover_ble_devices())
+
+
 async def _async_main(config: Config) -> int:
-    if config.list_ports:
-        print(format_ports(discover_ports()))
+    if config.list_ports or config.list_ble:
+        if config.list_ports:
+            print(format_ports(discover_ports()))
+        if config.list_ble:
+            print(format_ble_devices(await discover_ble_devices()))
         return 0
 
     if config.export_xlsx:
@@ -455,20 +515,18 @@ async def _async_main(config: Config) -> int:
         logger.info("Exported %s to %s", input_path, config.export_xlsx)
         return 0
 
-    port = config.port or select_port(discover_ports())
+    spec = await _resolve_transport(config.transport)
     store = CsvStore(config.output)
     store.load()
 
     async def connect():
-        return await MeshCoreSession.connect(
-            port, config.baudrate, config.debug
-        )
+        return await connect_session(spec, config.baudrate, config.debug)
 
     if config.loop:
         await _run_loop(config, store, connect)
         return 0
 
-    logger.info("Connecting to Companion on %s ...", port)
+    logger.info("Connecting to Companion via %s ...", spec.describe())
     session = await connect()
     started = time.monotonic()
     try:
