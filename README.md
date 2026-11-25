@@ -1,8 +1,9 @@
 # MeshCore Repeater Info
 
 Консольная утилита для сбора информации со всех репитеров в контакт-листе
-MeshCore Companion через USB serial. Результат — Excel-совместимый CSV-отчёт,
-который обновляется после каждого репитера.
+MeshCore Companion через USB serial, Bluetooth LE (BLE) или Wi-Fi (TCP).
+Результат — Excel-совместимый CSV-отчёт, который обновляется после каждого
+репитера.
 
 ## Что собирается
 
@@ -22,7 +23,7 @@ MeshCore Companion через USB serial. Результат — Excel-совм�
 ## Требования
 
 - Python 3.11 и [uv](https://docs.astral.sh/uv/);
-- MeshCore Companion, подключённый по USB serial;
+- MeshCore Companion, доступный по USB serial, BLE или Wi-Fi (TCP);
 - настройки радио на компаньоне уже выполнены.
 
 Версия и owner info через гостевой вход доступны на simple repeater
@@ -34,11 +35,14 @@ MeshCore Companion через USB serial. Результат — Excel-совм�
 ```bash
 uv sync
 
-# посмотреть serial-порты
+# посмотреть serial-порты и BLE-устройства
 uv run meshcore-repeater-info --list-ports
+uv run meshcore-repeater-info --list-ble
 
 # опросить все репитеры из контакт-листа
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 -o repeaters.csv
+uv run meshcore-repeater-info -p ble://MeshCore-A1B2 -o repeaters.csv
+uv run meshcore-repeater-info -p tcp://192.168.1.50:4000 -o repeaters.csv
 
 # безопасный тест: ровно один репитер
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 \
@@ -54,16 +58,43 @@ uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --loop
 uv run meshcore-repeater-info --input repeaters.csv --export-xlsx repeaters.xlsx
 ```
 
-Без `--port` утилита пытается автоматически выбрать единственный
-`usbmodem`/`ttyUSB`/`ttyACM` порт. Если портов несколько — потребуется
-`--port` или переменная `MESHCORE_PORT`.
+Без `--port` утилита сначала ищет единственный `usbmodem`/`ttyUSB`/`ttyACM`
+порт. Если подходящих serial-портов нет, она сканирует BLE и подключается
+к единственному найденному MeshCore. Если кандидатов несколько — потребуется
+`--port` или переменная `MESHCORE_PORT` с тем же значением, что и `-p`.
+
+## Транспорты
+
+`-p/--port` принимает не только путь к serial-порту, но и URI транспорта:
+
+| Значение | Транспорт |
+|---|---|
+| `/dev/cu.usbmodem1101`, `COM3` | serial |
+| `ble` | BLE: скан и единственный найденный MeshCore |
+| `ble://MeshCore-A1B2` | BLE по подстроке имени |
+| `ble://24:62:AB:12:34:56` | BLE по адресу |
+| `tcp://192.168.1.50` | Wi-Fi/TCP, порт 4000 по умолчанию |
+| `tcp://192.168.1.50:4000` | TCP с явным портом |
+
+- Простая строка без схемы всегда считается serial-путём, поэтому старые
+  команды и `MESHCORE_PORT=/dev/...` работают как раньше.
+- Для BLE-парринга с PIN добавьте `--ble-pin 123456` (только вместе с BLE).
+- На macOS CoreBluetooth выдаёт UUID вместо MAC-адреса; указывать его можно
+  так же через `ble://...`. Если адрес неизвестен, используйте `--list-ble`.
+- Если serial-портов нет, а BLE-устройств несколько, утилита не выбирает
+  наугад, а показывает список и просит указать `ble://<имя-или-адрес>`.
+- TCP-порт по умолчанию — 4000; если на компаньоне настроен другой, укажите
+  его явно.
 
 ## Основные флаги
 
 | Флаг | Назначение |
 |---|---|
-| `-p, --port` | serial-порт компаньона |
-| `-b, --baudrate` | скорость, по умолчанию 115200 |
+| `-p, --port` | serial-порт или URI транспорта (`ble`, `ble://NAME`, `tcp://HOST[:PORT]`) |
+| `--ble-pin` | PIN для BLE-парринга |
+| `-b, --baudrate` | скорость serial, по умолчанию 115200 |
+| `--list-ports` | показать serial-порты |
+| `--list-ble` | показать найденные MeshCore BLE-устройства |
 | `-o, --output` | путь к CSV, по умолчанию `repeaters.csv` |
 | `-f, --force` | переопросить всё, сбросить счётчики и `final_fail` |
 | `--alive` | переопросить только «живые»: `status=ok` и `ok_old` |
@@ -183,6 +214,9 @@ uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --loop
 
 - каждый проход заново читает контакт-лист — новые репитеры подхватываются;
 - между проходами пауза `--loop-interval` (60 с);
+- перед каждым репитером проверяется связь: если BLE/Wi-Fi-соединение
+  потеряно, проход прерывается, уже сохранённые строки CSV остаются, а на
+  следующем проходе утилита переподключается;
 - Ctrl+C останавливает цикл.
 
 В режиме `--loop` проверяется свежесть адверта: если `last_advert` контакта
@@ -251,4 +285,5 @@ uv run pytest
 ```
 
 Тесты покрывают форматирование CSV, login-политику, flood/path state machine,
-повторы запросов, парсинг owner info и статусов, resume/force.
+повторы запросов, парсинг owner info и статусов, resume/force, разбор
+транспортов и BLE-скан.

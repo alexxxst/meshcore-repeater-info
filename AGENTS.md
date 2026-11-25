@@ -6,9 +6,9 @@ This file is the durable memory for a fresh session. Read it first, then
 ## What this project is
 
 CLI tool that polls every MeshCore **repeater** from a MeshCore Companion
-contact list and writes an Excel-friendly CSV report. It works over the
-Companion serial/USB connection today; BLE/TCP were discussed but are **not
-implemented**.
+contact list and writes an Excel-friendly CSV report. It works over USB
+serial, Bluetooth LE (BLE) or Wi-Fi/TCP; the transport is chosen by the
+`-p/--port` value.
 
 Repository: https://github.com/alexxxst/meshcore-repeater-info (public)
 
@@ -18,7 +18,10 @@ Repository: https://github.com/alexxxst/meshcore-repeater-info (public)
 uv sync
 uv run pytest
 uv run meshcore-repeater-info --list-ports
+uv run meshcore-repeater-info --list-ble
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 -o repeaters.csv
+uv run meshcore-repeater-info -p ble://MeshCore-A1B2 -o repeaters.csv
+uv run meshcore-repeater-info -p tcp://192.168.1.50:4000 -o repeaters.csv
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --alive
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --dead
 uv run meshcore-repeater-info -p /dev/cu.usbmodem1101 --broken
@@ -34,19 +37,46 @@ one repeater at a time** unless they explicitly ask for a full run.
 
 ```
 src/meshcore_repeater_info/
-  cli.py        argparse, inventory orchestration, retry modes, summary
-  config.py     CLI config
-  mesh.py       MeshCoreSession, login, binary requests, flood/path tracking
+  cli.py        argparse, transport resolution, inventory orchestration, retry
+                modes, summary
+  config.py     CLI config (TransportSpec)
+  transport.py  transport URI parsing, env, BLE pick, session factory
+  mesh.py       MeshCoreSession, connect_serial/ble/tcp, login, binary
+                requests, flood/path tracking
   poller.py     per-repeater login policy + post-login request retries
   storage.py    CSV schema, atomic writes, resume/retry selection
   model.py      PollResult
   formatting.py uptime, percentages, UTC, clock skew
-  ports.py      serial port discovery
+  ports.py      serial port discovery + BLE scan
 ```
 
-The poller and CSV layers are transport-agnostic. `MeshCoreSession` is the
-only serial-specific part; adding BLE/TCP would mostly mean a connection
-factory plus CLI/config/docs (see `meshcore.MeshCore.create_ble/create_tcp`).
+The poller and CSV layers are transport-agnostic and only see the
+`MeshSession` protocol. `transport.py` turns `-p` into a `TransportSpec` and
+`connect_session()` calls the matching `MeshCoreSession` factory. BLE and TCP
+come from `meshcore.create_ble/create_tcp`; `bleak` is already a hard
+dependency of `meshcore`, so there is no extra dependency.
+
+## Transports
+
+`-p/--port` accepts:
+- a serial path (`/dev/cu.usbmodem1101`, `COM3`) — unchanged behaviour;
+- `ble` (scan, take the only MeshCore device), `ble://NAME` (advertised-name
+  substring), `ble://ADDRESS` (MAC on Linux/Windows, CoreBluetooth UUID on
+  macOS);
+- `tcp://HOST[:PORT]` — Wi-Fi companion, port defaults to **4000**;
+- `--ble-pin PIN` for BLE pairing, only valid with a BLE transport.
+
+`MESHCORE_PORT` accepts the same values. Without `-p`/env the order is:
+single likely serial port, then a BLE scan that must find exactly one MeshCore
+device. Multiple serial ports or multiple BLE devices are errors, not guesses.
+A string with an unknown scheme (`bluetooth://...`) is rejected; a string
+without a scheme is always a serial path.
+
+Before every repeater `run_inventory` checks `session.is_connected()`; a lost
+BLE/TCP link raises `TransportError`, which aborts the pass. `--loop`
+reconnects on the next pass; a one-shot run exits 1 with the report already
+saved. BLE scans happen on connect, so the first connect can take a few
+seconds.
 
 ## Current behavior
 
@@ -153,6 +183,8 @@ login_attempts_total;status;error
   rows selected by that mode are re-polled; in default loop mode a fresh
   advert can promote an `ok`/`final_fail` row.
 - On connection/pass failure the loop logs, closes, waits, and reconnects.
+  A lost BLE/TCP link raises `TransportError` between repeaters; the current
+  pass stops, saved rows stay in the CSV, and the next pass reconnects.
 
 ## Backups and validation
 
@@ -192,6 +224,9 @@ login_attempts_total;status;error
 ## Testing quirks
 
 - Unit tests use fake sessions; no radio is needed.
+- BLE/TCP are covered by unit tests with fake scanners/sessions. Real
+  BLE/Wi-Fi checks are the user's job, and no test may open the live USB node
+  or read/write a real `repeaters.csv`; always use `tmp_path`.
 - Real-hardware tests must stay at one repeater per command unless the user
   explicitly requests a full run.
 - A background process started with `&` from a non-interactive shell may
